@@ -1,0 +1,10 @@
+HOST = "irc.twitch.tv"
+PORT = 6667
+
+# channel and authentication info
+
+token = "oauth:"
+bot_name = ""
+bot_channel = ""
+
+join_msg = "Hello!"
