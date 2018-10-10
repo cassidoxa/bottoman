@@ -5,6 +5,7 @@ author: cassidoxa
 """
 
 import socket
+import json
 
 import config
 
@@ -28,19 +29,17 @@ class TwitchBot:
 
     def join_room(self, s):
 
-        readbuffer = ""
+        read_buffer = ""
         loading = False
         while not loading:
-            readbuffer = readbuffer + self.s.recv(2048).decode()
-            temp = readbuffer.split("\n")
-            readbuffer = temp.pop()
+            read_buffer = read_buffer + self.s.recv(2048).decode()
+            temp = read_buffer.split("\n")
+            read_buffer = temp.pop()
 
             for line in temp:
                 print(line)
-                loading = self.loading_complete(line)
-
-    def loading_complete(self, line):
-        return "End of /NAMES list" in line
+                if "End of /NAMES list" in line:
+                    loading = True
 
     def get_user(self, line):
         """
@@ -48,6 +47,7 @@ class TwitchBot:
         """
         separate = line.split(":", 2)
         user = separate[1].split("!", 1)[0]
+        print(user) #        
         return user.rstrip()
 
     def get_message(self, line):
@@ -56,6 +56,12 @@ class TwitchBot:
         """
         separate = line.split(":", 2)
         message = separate[2]
+
+        if message[0] == '!':
+            run_command(message)        
+        else:
+            pass
+        print (message) #
         return message.rstrip()
 
     def send_message(self, message):
@@ -72,3 +78,32 @@ class TwitchBot:
         """
         self.send_message('/w ' + user + ' ' + message)
         print("Whispered to " + user + ': ' + message)
+
+    #functions for running chat commands in the format !example, loaded from command.json in run.py initialization
+    
+    @staticmethod
+    def load_commands(command_file):
+        with open(command_file, 'r') as f:
+            command_list = json.load(f)
+        return command_list
+
+    def run_command(message, command_dict):
+        command = message.split()[0][1:]
+        print(command_dict[command])
+
+    def runtime(self):
+        while True:
+            read_buffer = self.read_buffer + self.s.recv(2048).decode()
+            temp = read_buffer.split("\n")
+            read_buffer = temp.pop()
+
+            for line in temp:
+
+                if (line.startswith("PING ")):    # If PING, respond with PONG
+                    self.s.send(b"PONG http://localhost\r\n")
+                    break
+
+                user = self.get_user(line)
+                message = self.get_message(line)
+                # Should probably do logging rather than just printing to console
+                print(user + " typed: " + message)
