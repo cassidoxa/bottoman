@@ -6,7 +6,7 @@ author: cassidoxa
 
 import socket
 import json
-import select
+import re
 
 import config
 
@@ -52,29 +52,28 @@ class TwitchBot:
 
     #functions for parsing messages, running commands, and sending messages from the bot
 
-    def get_user(self, line):
-
-        separate = line.split(":", 2)
-        user = separate[1].split("!", 1)[0]        
-        return user.rstrip()
-
     def parse_message(self, line):
         
-        #handle pings from server first
-        if (line.startswith("PING ")):  
+        #parse message into list for further processing, respond to server pings
+        #return user and clean message
+        separate = re.split('[:!]', line, 3)
+        if separate[0].rstrip() == 'PING':  
             self.s.send(b"PONG http://localhost\r\n")
             print('PONG')
-        
         else:
-            separate = line.split(":", 2)
-            message = separate[2] 
-            return message.rstrip()
+            user = separate[1]
+            message = separate[3].rstrip()
+            return (user, message)
 
-    def handle_message(self, message):
+    def handle_message(self, user, message):
         
+        print(f'{user} wrote: {message}') #
         if message[0] == '!':
             command = message[1:]
-            self.run_command(command)
+            if command in self.command_dict:
+                self.run_command(command)
+            elif command not in self.command_dict:
+                pass
         else:
             pass
 
@@ -98,13 +97,14 @@ class TwitchBot:
     def run_time(self):
         while True:
             read_buffer = self.read_buffer + self.s.recv(2048).decode()
-            temp = read_buffer.split("\n")
-            read_buffer = temp.pop()
+            user, message = self.parse_message(read_buffer)
 
-            for line in temp:
-                user = self.get_user(line)
-                message = self.parse_message(line)
-                
-                self.handle_message(message)
-                print(f'{user} typed: {message}')
+            self.handle_message(user, message)
+
+#            for line in temp:
+#                user = self.get_user(line)
+#                message = self.parse_message(line)
+#                
+#                self.handle_message(message)
+#                print(f'{user} typed: {message}')
 
