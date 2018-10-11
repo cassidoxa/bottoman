@@ -71,15 +71,11 @@ class TwitchBot:
         if message[0] == '!':
             command = message[1:]
             if command in self.command_dict:
-                self.run_command(command)
+                self.send_message(self.command_dict[command])
             elif command not in self.command_dict:
                 pass
         else:
             pass
-
-    def run_command(self, message):
-        command = message
-        self.send_message(self.command_dict[command])
 
     def send_message(self, message):
 
