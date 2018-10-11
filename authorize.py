@@ -7,7 +7,7 @@ print(f'In "Manage Application," set the Redirect URL to "http://localhost" and 
 
 client_id = input("\nPlease enter Client ID: ").rstrip()
 
-url = f'https://id.twitch.tv/oauth2/authorize?response_type=token&client_id={client_id}&redirect_uri=http://localhost&scope=user:edit+channel:moderate+chat:edit+chat:read+whispers:read+whispers:edit'
+url = f'https://id.twitch.tv/oauth2/authorize?response_type=token&client_id={client_id}&redirect_uri=http://localhost&scope=chat:read+channel:moderate+chat:edit+whispers:read+whispers:edit'
 
 webbrowser.open(url, new=2)
 
