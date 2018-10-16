@@ -7,8 +7,10 @@ author: cassidoxa
 import socket
 import json
 import re
+import time
 
 import config
+from chatters import ChattersHandler
 
 class TwitchBot:
 
@@ -17,7 +19,6 @@ class TwitchBot:
         self.s = self.open_socket()
 
         self.active_game = False
-        self.read_buffer = ""
         self.command_dict = self.load_commands('commands.json')
 
     #functions for initializing bot, joining room, loading static commands   
@@ -54,28 +55,20 @@ class TwitchBot:
 
     def parse_message(self, line):
         
+        #first check if None
         #parse message into list for further processing, respond to server pings
-        #return user and clean message
+        #return user, clean message, and unix time(for points timeout)
+
         separate = re.split('[:!]', line, 3)
         if separate[0].rstrip() == 'PING':  
             self.s.send(b"PONG http://localhost\r\n")
-            print('PONG')
+            comment_time = int(time.time())
+            return ("twitch_server", "ping", comment_time)
         else:
             user = separate[1]
             message = separate[3].rstrip()
-            return (user, message)
-
-    def handle_message(self, user, message):
-        
-        print(f'{user} wrote: {message}') #
-        if message[0] == '!':
-            command = message[1:]
-            if command in self.command_dict:
-                self.send_message(self.command_dict[command])
-            elif command not in self.command_dict:
-                pass
-        else:
-            pass
+            comment_time = int(time.time())
+            return (user, message, comment_time)
 
     def send_message(self, message):
 
@@ -91,16 +84,12 @@ class TwitchBot:
     #main infinite loop
 
     def run_time(self):
+        
         while True:
-            read_buffer = self.read_buffer + self.s.recv(2048).decode()
-            user, message = self.parse_message(read_buffer)
+           
+            read_buffer = self.s.recv(2048).decode()
+            user, message, comment_time = self.parse_message(read_buffer)
 
-            self.handle_message(user, message)
+            print(f'{user} wrote: {message} at {comment_time}')
 
-#            for line in temp:
-#                user = self.get_user(line)
-#                message = self.parse_message(line)
-#                
-#                self.handle_message(message)
-#                print(f'{user} typed: {message}')
 
