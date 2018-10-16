@@ -10,18 +10,17 @@ import re
 import time
 
 import config
-from chatters import ChattersHandler
+from messagehandler import MessageHandler
 
 class TwitchBot:
 
     def __init__(self):
 
         self.s = self.open_socket()
-
         self.active_game = False
-        self.command_dict = self.load_commands('commands.json')
+        
 
-    #functions for initializing bot, joining room, loading static commands   
+    #functions for initializing bot, joining room  
 
     def open_socket(self):
 
@@ -45,11 +44,6 @@ class TwitchBot:
                 print(line)
                 if "End of /NAMES list" in line:
                     loading = True
-    
-    def load_commands(self, command_file):
-        with open(command_file, 'r') as f:
-            command_list = json.load(f)
-        return command_list
 
     #functions for parsing messages, running commands, and sending messages from the bot
 
@@ -62,8 +56,7 @@ class TwitchBot:
         separate = re.split('[:!]', line, 3)
         if separate[0].rstrip() == 'PING':  
             self.s.send(b"PONG http://localhost\r\n")
-            comment_time = int(time.time())
-            return ("twitch_server", "ping", comment_time)
+            return ("twitch server", "ping", 0)
         else:
             user = separate[1]
             message = separate[3].rstrip()
@@ -86,10 +79,13 @@ class TwitchBot:
     def run_time(self):
         
         while True:
-           
+            
+            #receive data, parse, give to message handler
             read_buffer = self.s.recv(2048).decode()
             user, message, comment_time = self.parse_message(read_buffer)
 
-            print(f'{user} wrote: {message} at {comment_time}')
+            message_handler = MessageHandler(user, message, comment_time, self.s)
+            message_handler.handle_message()
+
 
 

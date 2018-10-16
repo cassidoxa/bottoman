@@ -5,12 +5,24 @@ import config
 from config import points_cooldown, message_points
 
 class MessageHandler:
-    def __init__(self):
+
+    def __init__(self, user, message, comment_time, s):
+        
+        self.user = user
+        self.message = message
+        self.comment_time = comment_time
+        self.s = s
         
         self.chatters_dict = self.load_chatters('chatters.json')
-        self.user = ''
-        self.message = ''
-        self.comment_time = 0
+        self.commands_dict = self.load_commands('commands.json')
+
+    def send_message(self, message):
+
+        messageTemp = f'PRIVMSG #{config.bot_channel} :{message}'
+        self.s.send(f'{messageTemp}\r\n'.encode('utf-8'))
+        print(f'Sent: {messageTemp}')
+
+    #functions for loading and saving persistent data
 
     def load_chatters(self, chatters_file):
         
@@ -18,43 +30,68 @@ class MessageHandler:
             chatters = json.load(f)
         return chatters
 
-    def write_chatters(self, chatters_dict):
+    def load_commands(self, command_file):
+        with open(command_file, 'r') as f:
+            command_list = json.load(f)
+        return command_list
+
+    def write_chatters(self):
         
         with open('chatters.json', 'w') as f:
-            json.dump(chatters, f)
+            json.dump(self.chatters_dict, f)
         return
 
-    def check_user(self, user, chatters_dict):
+    #user related functions
+
+    def check_user(self):
         
         #check if user in flat db. if not, add them
-        if user not in chatters_dict:
-            chatters_dict[user] = { "permissions" : "none",
-                                    "points" : "1",
-                                    "comment_time" : int(time.time())
-                                  }
-        else:
-            pass
-        return chatters_dict
+        if self.user not in self.chatters_dict:
+            self.chatters_dict[self.user] = { "permissions" : "none",
+                                              "points" : 1,
+                                              "comment_time" : int(time.time())
+                                            }
+            return
 
-    def add_points(user, chatters_dict, comment_time):
+        else:
+            return
+
+    def add_points(self):
+        """
+        checks to see if points cooldown is active. if not, adds number of points set in config.py for one message
+        """
         
-        #add points and reset cooldown
-        if int(time.time()) - comment_time > points_cooldown:
-            chatters_dict[user]["points"] += message_points
-            chatters_dict[user]["comment_time"] = int(time.time())
+        new_points = self.chatters_dict[self.user]['points'] + config.message_points
+        if (self.comment_time - self.chatters_dict[self.user]["comment_time"]) >= config.points_cooldown:
+            self.chatters_dict[self.user]["points"] = int(new_points)
+            self.chatters_dict[self.user]["comment_time"] = int(time.time())
+            return
         else:
-            pass
-        return chatters_dict
+            return
 
-    def handle_message(self, user, message, comment_time, chatters_dict):
+    #message handling
 
-        if message[0] == '!':
-            command = message[1:]
-            if command in self.command_dict:
-                self.send_message(self.command_dict[command])
-            elif command not in self.command_dict:
+    def handle_message(self):
+        
+        self.check_user()
+        self.add_points()
+
+        if self.message[0] == '!':
+            command = self.message[1:]
+            if command in self.commands_dict:
+                self.send_message(self.commands_dict[command])
+            elif command not in self.commands_dict:
                 pass
         else:
-            pass #TODO implement the other stuff
-        
+            pass
+
+        self.write_chatters()
         return
+
+
+
+
+
+
+
+
