@@ -1,20 +1,24 @@
 import json
 import time
-import config
+import re
 
-from config import points_cooldown, message_points
+import config
 
 class MessageHandler:
 
     def __init__(self, user, message, comment_time, s):
         
-        self.user = user
+        self.user = user.lower()
+        self.permissions = ""
         self.message = message
         self.comment_time = comment_time
         self.s = s
         
         self.chatters_dict = self.load_chatters('chatters.json')
         self.commands_dict = self.load_commands('commands.json')
+        
+        self.dynamic_commands = ["changeuser", "addcommand"]
+        self.permission_hierarchy = {"none" : 0, "mod" : 1, "admin" : 2}
 
     def send_message(self, message):
 
@@ -27,13 +31,13 @@ class MessageHandler:
     def load_chatters(self, chatters_file):
         
         with open(chatters_file, 'r') as f:
-            chatters = json.load(f)
-        return chatters
+            chatters_dict = json.load(f)
+        return chatters_dict
 
     def load_commands(self, command_file):
         with open(command_file, 'r') as f:
-            command_list = json.load(f)
-        return command_list
+            command_dict = json.load(f)
+        return command_dict
 
     def write_chatters(self):
         
@@ -43,17 +47,23 @@ class MessageHandler:
 
     #user related functions
 
-    def check_user(self):
-        
-        #check if user in flat db. if not, add them
-        if self.user not in self.chatters_dict:
-            self.chatters_dict[self.user] = { "permissions" : "none",
-                                              "points" : 1,
+    def add_user(self, added_user, init_points):
+        self.chatters_dict[added_user] = { "permissions" : "none",
+                                              "points" : init_points,
                                               "comment_time" : int(time.time())
                                             }
+        return
+
+    def check_user(self):
+        """
+        check if user in flat db. if not, add them. check and set user permissions for instance
+        """
+        if self.user not in self.chatters_dict:
+            self.add_user(self.user, 1)
             return
 
         else:
+            self.permissions = self.chatters_dict[self.user]["permissions"]
             return
 
     def add_points(self):
@@ -69,16 +79,58 @@ class MessageHandler:
         else:
             return
 
+    def change_permissions(self, changed_user, new_permissions):
+        if self.permissions == "admin":
+            clean_user = changed_user.lower()
+            if clean_user not in self.chatters_dict:
+                self.add_user(clean_user, 0)
+                self.chatters_dict[clean_user]["permissions"] = new_permissions
+            else:
+                self.chatters_dict[clean_user]["permissions"] = new_permissions
+            self.send_message(f'{changed_user} had permissions changed to {new_permissions}')
+            return
+        else:
+            return
+    
+    #command related functions
+
+    def dynamic_command(self, command):
+
+        permissions = self.chatters_dict[self.user.lower()]["permissions"]
+        if permissions == "none":
+            return
+        elif permissions != "none":
+            if command[1] == "addcommand":
+                self.add_command(command[2], command[3])
+            elif command[1] == "changeuser":
+                self.change_permissions(command[2], command[3])
+            return
+
+    def add_command(self, new_command, command_text):
+        
+        self.commands_dict[new_command] = str(command_text)
+        self.write_commands()
+        return        
+        
+    def write_commands(self):
+        
+        with open('commands.json', 'w') as f:
+            json.dump(self.commands_dict, f)
+        return
+    
     #message handling
 
     def handle_message(self):
-        
+
+        separate = re.split('[ !]', self.message, 3)     
         self.check_user()
         self.add_points()
 
         if self.message[0] == '!':
             command = self.message[1:]
-            if command in self.commands_dict:
+            if separate[1] in self.dynamic_commands:
+                self.dynamic_command(separate)
+            elif command in self.commands_dict:
                 self.send_message(self.commands_dict[command])
             elif command not in self.commands_dict:
                 pass
