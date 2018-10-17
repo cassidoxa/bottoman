@@ -17,8 +17,8 @@ class MessageHandler:
         self.chatters_dict = self.load_chatters('chatters.json')
         self.commands_dict = self.load_commands('commands.json')
         
-        self.dynamic_commands = ["changeuser", "addcommand", "delcommand"]
-        self.permission_hierarchy = {"none" : 0, "mod" : 1, "admin" : 2}
+        self.dynamic_commands = ["changeuser", "addcommand", "delcommand", "points", "give", "take"]
+        self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
 
     def send_message(self, message):
 
@@ -49,15 +49,16 @@ class MessageHandler:
 
     def add_user(self, added_user, init_points):
         self.chatters_dict[added_user] = { "permissions" : "none",
-                                              "points" : init_points,
-                                              "comment_time" : int(time.time())
-                                            }
+                                           "points" : init_points,
+                                           "comment_time" : int(time.time())
+                                         }
         return
 
     def check_user(self):
         """
         check if user in flat db. if not, add them. check and set user permissions for instance
         """
+        
         if self.user not in self.chatters_dict:
             self.add_user(self.user, 1)
             return
@@ -79,7 +80,12 @@ class MessageHandler:
         else:
             return
 
+    def get_points(self):
+        "send message to chat telling user how many points they have"
+        self.send_message(f'{self.user}, you have {self.chatters_dict[self.user]["points"]} points')
+
     def change_permissions(self, changed_user, new_permissions):
+        
         if new_permissions not in self.permission_hierarchy.keys():
             self.send_message(f'"{new_permissions}" is not a valid user permissions setting')
             return
@@ -97,33 +103,67 @@ class MessageHandler:
             return
         else:
             return
-    
-    #command related functions
+
+    def give_points(self, user, added_points):
+        
+        if user in self.chatters_dict.keys():
+            new_total = self.chatters_dict[user]["points"] + int(added_points)
+            self.chatters_dict[user]["points"] = new_total
+            self.send_message(f'{self.user} gave {user} {added_points} points')
+            self.write_chatters()
+        elif user not in self.chatters_dict.keys():
+            self.add_user(user, added_points)
+            self.write_chatters()
+                
+        return
+
+    def take_points(self, user, removed_points):
+
+        if user in self.chatters_dict.keys():
+            new_total = self.chatters_dict[user]["points"] - int(removed_points)
+            self.chatters_dict[user]["points"] = new_total
+            self.send_message(f'{self.user} took {removed_points} points from {user}')
+            self.write_chatters()
+        elif user not in self.chatters_dict.keys():
+            return
+                
+        return
+
+    #command functions
 
     def dynamic_command(self, command):
         """
-        function for dynamic commands that mods and admins can run such as adding static commands, changing permissions, starting games, etc
-        dynamic functions are hard coded with a progressive permissions check (0, 1, 2 for none, mod, admin etc) that does nothing
-        and returns if user does not have sufficient permissions. dynamic commands must be added to self.dynamic_commands list to be used here
+        run commands that either have dynamic output or change some bot/user data. checks for correct permissions before running
+        all dynamic commands except for games are hardcoded here and must be in self.dynamic_commands
         """
 
         permissions = self.chatters_dict[self.user.lower()]["permissions"]
-        if permissions == "none":
-            return
-        elif self.permission_hierarchy[permissions] >= 1:
-            if command[1] == "addcommand":
-                self.add_command(command[2], command[3])
-            elif command[1] == "delcommand":
-                self.del_command(command[2])
-            elif command[1] == "changeuser":
-                self.change_permissions(command[2], command[3])
+
+        if command[1] == "points":
+            self.get_points()
+        elif command[1] == "addcommand" and self.permission_hierarchy[permissions] >= 2:
+            self.add_command(command[2], command[3])
+        elif command[1] == "delcommand" and self.permission_hierarchy[permissions] >= 2:
+            self.del_command(command[2])
+        elif command[1] == "changeuser" and self.permission_hierarchy[permissions] >= 3:
+            self.change_permissions(command[2], command[3])
+        elif command[1] == "give" and self.permission_hierarchy[permissions] >= 3:
+            self.give_points(command[2], command[3])
+        elif command[1] == "take" and self.permission_hierarchy[permissions] >= 3:
+            self.take_points(command[2], command[3])
+        else:
+            pass
         return
 
     def add_command(self, new_command, command_text):
         
-        self.commands_dict[new_command] = str(command_text).lower()
-        self.send_message(f'{self.user} added the command "!{new_command.lower()}"')
-        self.write_commands()
+        if new_command in self.dynamic_commands:
+            self.send_message(f'"{new_command}" is a reserved command')
+        else:
+            self.commands_dict[new_command] = str(command_text).lower()
+            self.send_message(f'{self.user} added the command "!{new_command.lower()}"')
+            self.write_commands()
+        
         return
 
     def del_command(self, deleted_command):
@@ -151,20 +191,22 @@ class MessageHandler:
         self.check_user()
         self.add_points()
 
-        if self.message[0] == '!':
+        if self.message[0] == "!":
             command = self.message[1:].lower()
             if separate[1] in self.dynamic_commands:
                 self.dynamic_command(separate)
-            elif command in self.commands_dict:
+            elif separate[1] in self.commands_dict:
                 self.send_message(self.commands_dict[command])
-            elif command not in self.commands_dict:
+            elif separate[1] not in self.commands_dict:
                 pass
+        elif self.message[0] == "?":
+            pass
         else:
             pass
         
         print(f'{self.user} wrote: {self.message} at {self.comment_time}')
         self.write_chatters()
-        return
+        return "yeah"
 
 
 

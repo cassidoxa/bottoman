@@ -53,7 +53,7 @@ class TwitchBot:
             user = separate[1]
             message = separate[3].rstrip()
             comment_time = int(time.time())
-            return (user.lower(), message, comment_time)
+            return (user, message, comment_time)
 
     def send_message(self, message):
 
@@ -79,6 +79,7 @@ class TwitchBot:
 
             message_handler = MessageHandler(user, message, comment_time, self.s)
             message_handler.handle_message()
+            
 
 
 
