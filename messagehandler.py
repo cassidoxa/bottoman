@@ -17,7 +17,7 @@ class MessageHandler:
         self.chatters_dict = self.load_chatters('chatters.json')
         self.commands_dict = self.load_commands('commands.json')
         
-        self.dynamic_commands = ["changeuser", "addcommand"]
+        self.dynamic_commands = ["changeuser", "addcommand", "delcommand"]
         self.permission_hierarchy = {"none" : 0, "mod" : 1, "admin" : 2}
 
     def send_message(self, message):
@@ -80,6 +80,12 @@ class MessageHandler:
             return
 
     def change_permissions(self, changed_user, new_permissions):
+        if new_permissions not in self.permission_hierarchy.keys():
+            self.send_message(f'"{new_permissions}" is not a valid user permissions setting')
+            return
+        else:
+            pass
+        
         if self.permissions == "admin":
             clean_user = changed_user.lower()
             if clean_user not in self.chatters_dict:
@@ -95,22 +101,41 @@ class MessageHandler:
     #command related functions
 
     def dynamic_command(self, command):
+        """
+        function for dynamic commands that mods and admins can run such as adding static commands, changing permissions, starting games, etc
+        dynamic functions are hard coded with a progressive permissions check (0, 1, 2 for none, mod, admin etc) that does nothing
+        and returns if user does not have sufficient permissions. dynamic commands must be added to self.dynamic_commands list to be used here
+        """
 
         permissions = self.chatters_dict[self.user.lower()]["permissions"]
         if permissions == "none":
             return
-        elif permissions != "none":
+        elif self.permission_hierarchy[permissions] >= 1:
             if command[1] == "addcommand":
                 self.add_command(command[2], command[3])
+            elif command[1] == "delcommand":
+                self.del_command(command[2])
             elif command[1] == "changeuser":
                 self.change_permissions(command[2], command[3])
-            return
+        return
 
     def add_command(self, new_command, command_text):
         
-        self.commands_dict[new_command] = str(command_text)
+        self.commands_dict[new_command] = str(command_text).lower()
+        self.send_message(f'{self.user} added the command "!{new_command.lower()}"')
         self.write_commands()
-        return        
+        return
+
+    def del_command(self, deleted_command):
+  
+        try:
+            del self.commands_dict[deleted_command]
+            self.send_message(f'{self.user} deleted the command "!{deleted_command.lower()}"')
+            self.write_commands()
+        except KeyError:
+            self.send_message(f'"{deleted_command.lower()}" command does not exist')
+
+        return      
         
     def write_commands(self):
         
@@ -118,7 +143,7 @@ class MessageHandler:
             json.dump(self.commands_dict, f)
         return
     
-    #message handling
+    #further parsing and message handling
 
     def handle_message(self):
 
@@ -127,7 +152,7 @@ class MessageHandler:
         self.add_points()
 
         if self.message[0] == '!':
-            command = self.message[1:]
+            command = self.message[1:].lower()
             if separate[1] in self.dynamic_commands:
                 self.dynamic_command(separate)
             elif command in self.commands_dict:
@@ -136,7 +161,8 @@ class MessageHandler:
                 pass
         else:
             pass
-
+        
+        print(f'{self.user} wrote: {self.message} at {self.comment_time}')
         self.write_chatters()
         return
 
