@@ -45,6 +45,7 @@ class TwitchBot:
                 if "End of /NAMES list" in line:
                     loading = True
 
+
     #functions for parsing messages, running commands, and sending messages from the bot
 
     def parse_message(self, line):
@@ -61,7 +62,7 @@ class TwitchBot:
             user = separate[1]
             message = separate[3].rstrip()
             comment_time = int(time.time())
-            return (user, message, comment_time)
+            return (user.lower(), message, comment_time)
 
     def send_message(self, message):
 
