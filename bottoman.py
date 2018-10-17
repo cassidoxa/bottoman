@@ -1,9 +1,3 @@
-"""
-04-10-2018
-
-author: cassidoxa
-"""
-
 import socket
 import json
 import re
@@ -17,9 +11,7 @@ class TwitchBot:
     def __init__(self):
 
         self.s = self.open_socket()
-        self.active_game = False
         
-
     #functions for initializing bot, joining room  
 
     def open_socket(self):
@@ -49,11 +41,10 @@ class TwitchBot:
     #functions for parsing messages, running commands, and sending messages from the bot
 
     def parse_message(self, line):
+        """
+        takes chat data from twitch and returns a clean user, message, and unix time to give to message handler
+        """
         
-        #first check if None
-        #parse message into list for further processing, respond to server pings
-        #return user, clean message, and unix time(for points timeout)
-
         separate = re.split('[:!]', line, 3)
         if separate[0].rstrip() == 'PING':  
             self.s.send(b"PONG http://localhost\r\n")
@@ -78,10 +69,11 @@ class TwitchBot:
     #main infinite loop
 
     def run_time(self):
-        
+        """
+        recieves data from twitch, parses it, gives individual messages to message handler for further processing
+        """
+
         while True:
-            
-            #receive data, parse, give to message handler
             read_buffer = self.s.recv(2048).decode()
             user, message, comment_time = self.parse_message(read_buffer)
 
