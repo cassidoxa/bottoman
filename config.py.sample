@@ -1,10 +1,14 @@
 HOST = "irc.twitch.tv"
 PORT = 6667
 
-# channel and authentication info
+#channel and authentication info
 
 token = "oauth:"
 bot_name = ""
 bot_channel = ""
+join_msg = "VoHiYo"
 
-join_msg = "Hello!"
+#points options
+
+message_points = 1 #points per message
+points_cooldown = 80 #cooldown for earning points by chatting in seconds
