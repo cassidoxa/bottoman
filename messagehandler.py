@@ -17,7 +17,7 @@ class MessageHandler:
         self.chatters_dict = self.load_chatters('chatters.json')
         self.commands_dict = self.load_commands('commands.json')
         
-        self.dynamic_commands = ["changeuser", "addcommand", "delcommand", "points", "give", "take"]
+        self.dynamic_commands = ["changeuser", "addcommand", "delcommand", "commands", "points", "give", "take"]
         self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
 
     def send_message(self, message):
@@ -70,6 +70,7 @@ class MessageHandler:
     def add_points(self):
         """
         checks to see if points cooldown is active. if not, adds number of points set in config.py for one message
+        the function for an admin to give a user a custom amount of points is give_points
         """
         
         new_points = self.chatters_dict[self.user]['points'] + config.message_points
@@ -110,10 +111,9 @@ class MessageHandler:
             new_total = self.chatters_dict[user]["points"] + int(added_points)
             self.chatters_dict[user]["points"] = new_total
             self.send_message(f'{self.user} gave {user} {added_points} points')
-            self.write_chatters()
+
         elif user not in self.chatters_dict.keys():
             self.add_user(user, added_points)
-            self.write_chatters()
                 
         return
 
@@ -121,9 +121,13 @@ class MessageHandler:
 
         if user in self.chatters_dict.keys():
             new_total = self.chatters_dict[user]["points"] - int(removed_points)
-            self.chatters_dict[user]["points"] = new_total
-            self.send_message(f'{self.user} took {removed_points} points from {user}')
-            self.write_chatters()
+            if new_total < 0:
+                self.chatters_dict[user]["points"] = 0
+            else:
+                self.chatters_dict[user]["points"] = new_total
+
+            self.send_message(f'{self.user} took {removed_points} points from {user}. {user} now has {self.chatters_dict[user]["points"]} points.')
+            
         elif user not in self.chatters_dict.keys():
             return
                 
@@ -175,7 +179,10 @@ class MessageHandler:
         except KeyError:
             self.send_message(f'"{deleted_command.lower()}" command does not exist')
 
-        return      
+        return
+
+    def list_commands(self):
+        commands_string = ""
         
     def write_commands(self):
         
@@ -183,6 +190,10 @@ class MessageHandler:
             json.dump(self.commands_dict, f)
         return
     
+    #admin functions
+
+    
+
     #further parsing and message handling
 
     def handle_message(self):
@@ -207,11 +218,5 @@ class MessageHandler:
         print(f'{self.user} wrote: {self.message} at {self.comment_time}')
         self.write_chatters()
         return "yeah"
-
-
-
-
-
-
 
 
