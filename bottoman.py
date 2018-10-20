@@ -71,6 +71,7 @@ class TwitchBot:
     def run_time(self):
         """
         recieves data from twitch, parses it, gives individual messages to message handler for further processing
+        the message handler can return an instruction to the bot in the "instruction" variable. 
         """
 
         while True:
@@ -78,7 +79,7 @@ class TwitchBot:
             user, message, comment_time = self.parse_message(read_buffer)
 
             message_handler = MessageHandler(user, message, comment_time, self.s)
-            message_handler.handle_message()
+            instruction = message_handler.handle_message()
             
 
 
