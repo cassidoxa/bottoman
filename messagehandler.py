@@ -169,30 +169,33 @@ class MessageHandler:
 
         permissions = self.chatters_dict[self.user.lower()]["permissions"]
 
-        if command[1] == "points":
-            self.get_points()
-        elif command[1] == "rewards":
-            self.list_rewards()
-        elif command[1] == "spend":
-            self.spend_points(command[2:])
-        elif command[1] == "commands":
-            self.list_commands()
-        elif command[1] == "addcommand" and self.permission_hierarchy[permissions] >= 2:
-            self.add_command(command[2], command[3])
-        elif command[1] == "delcommand" and self.permission_hierarchy[permissions] >= 2:
-            self.del_command(command[2])
-        elif command[1] == "changeuser" and self.permission_hierarchy[permissions] >= 3:
-            self.change_permissions(command[2], command[3])
-        elif command[1] == "give" and self.permission_hierarchy[permissions] >= 3:
-            self.give_points(command[2], command[3])
-        elif command[1] == "take" and self.permission_hierarchy[permissions] >= 3:
-            self.take_points(command[2], command[3])
-        elif command[1] == "addreward" and self.permission_hierarchy[permissions] >= 3:
-            self.add_reward(command[3], command[2])
-        elif command[1] == "delreward" and self.permission_hierarchy[permissions] >= 3:
-            self.delete_reward(command[2:])
-        else:
-            pass
+        try:
+            if command[1] == "points":
+                self.get_points()
+            elif command[1] == "rewards":
+                self.list_rewards()
+            elif command[1] == "spend":
+                self.spend_points(command[2:])
+            elif command[1] == "commands":
+                self.list_commands()
+            elif command[1] == "addcommand" and self.permission_hierarchy[permissions] >= 2:
+                self.add_command(command[2], command[3])
+            elif command[1] == "delcommand" and self.permission_hierarchy[permissions] >= 2:
+                self.del_command(command[2])
+            elif command[1] == "changeuser" and self.permission_hierarchy[permissions] >= 3:
+                self.change_permissions(command[2], command[3])
+            elif command[1] == "give" and self.permission_hierarchy[permissions] >= 3:
+                self.give_points(command[2], command[3])
+            elif command[1] == "take" and self.permission_hierarchy[permissions] >= 3:
+                self.take_points(command[2], command[3])
+            elif command[1] == "addreward" and self.permission_hierarchy[permissions] >= 3:
+                self.add_reward(command[3], command[2])
+            elif command[1] == "delreward" and self.permission_hierarchy[permissions] >= 3:
+                self.delete_reward(command[2:])
+
+        except IndexError:
+            self.send_message(f'Malformed command. Please try again')
+
         return
 
     def add_command(self, new_command, command_text):
@@ -228,7 +231,7 @@ class MessageHandler:
             if command != "chat rewards":    
                 commands_string += f', !{command}'
 
-        self.send_message(f'Currently available commands are: !points, !spend,{commands_string}')
+        self.send_message(f'Currently available commands are: !points, !spend{commands_string}')
         return
 
     def write_commands(self):
@@ -257,8 +260,13 @@ class MessageHandler:
     def add_reward(self, reward, cost):
         """
         add a reward to db that users can cash in points for. If reward exists, overwrite it.
-        TODO: check for malformed command before accepting
+        check for malformed command before accepting
         """
+
+        if isinstance(cost, int) == False:
+            self.send_message('Malformed command. Please try again in the format "!addreward [cost in points] [reward]"')
+            return
+
         self.commands_dict["chat rewards"][reward] = cost
         self.send_message(f'Reward added: {reward} - {cost}')
         self.write_commands()
@@ -282,11 +290,12 @@ class MessageHandler:
         let a user spend points on a reward. if insufficient points or mistyped reward, send a message telling the user.
         if sufficient points, send a message saying what the user bought and send a whisper to the channel owner.
         the value passed to this function is also manipulated and made into a useful string in desired_reward
-        TODO: remove int coercions maybe when fixing add reward function
         """
-
-        desired_reward = f'{reward[0]} {reward[1]}'
-        
+        try:
+            desired_reward = f'{reward[0]} {reward[1]}'
+        except IndexError:
+            self.send_message(f'Type !rewards to see available rewards. If you have enough !points, type the reward after !spend to purchase it')
+            return
         try:
             reward_cost = int(self.commands_dict["chat rewards"][desired_reward])
         except KeyError:
