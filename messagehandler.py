@@ -37,6 +37,11 @@ class MessageHandler:
         self.s.send(f'{messageTemp}\r\n'.encode('utf-8'))
         print(f'Sent: {messageTemp}')
 
+    def whisper(self, user, message):
+
+        self.send_message(f'/w {user} {message}')
+        print(f'Whispered to {user} : {message}')
+
     #functions for loading and saving persistent data
 
     def load_chatters(self, chatters_file):
@@ -169,7 +174,7 @@ class MessageHandler:
         elif command[1] == "rewards":
             self.list_rewards()
         elif command[1] == "spend":
-            self.spend_points(command[2], command[3])
+            self.spend_points(command[2:])
         elif command[1] == "commands":
             self.list_commands()
         elif command[1] == "addcommand" and self.permission_hierarchy[permissions] >= 2:
@@ -185,7 +190,7 @@ class MessageHandler:
         elif command[1] == "addreward" and self.permission_hierarchy[permissions] >= 3:
             self.add_reward(command[3], command[2])
         elif command[1] == "delreward" and self.permission_hierarchy[permissions] >= 3:
-            self.delete_reward(command[2])
+            self.delete_reward(command[2:])
         else:
             pass
         return
@@ -220,9 +225,10 @@ class MessageHandler:
 
         commands_string = ""
         for command in self.commands_dict.keys():
-            commands_string += f', !{command}'
+            if command != "chat rewards":    
+                commands_string += f', !{command}'
 
-        self.send_message(f'Currently available commands are: !points{commands_string}')
+        self.send_message(f'Currently available commands are: !points, !spend,{commands_string}')
         return
 
     def write_commands(self):
@@ -244,29 +250,62 @@ class MessageHandler:
             return
 
         rewards_string = ""
-        for reward, cost in self.commmands_dict["chat rewards"].items():
-            rewards_string += f'{reward} - {cost}\n'
-        self.send_message(rewards_string)
+        for reward, cost in self.commands_dict["chat rewards"].items():
+            rewards_string += f'{reward} - {cost}, '
+        self.send_message(rewards_string[0:-2])
 
     def add_reward(self, reward, cost):
         """
         add a reward to db that users can cash in points for. If reward exists, overwrite it.
+        TODO: check for malformed command before accepting
         """
         self.commands_dict["chat rewards"][reward] = cost
         self.send_message(f'Reward added: {reward} - {cost}')
+        self.write_commands()
 
     def delete_reward(self, reward):
         """
-        delete a reward from db
+        check to see if the reward is in db then delete a reward from db and saves new db
+        send message to chat about the deleted reward. function first manipulates the passed value to access dict key
         """
-        pass
+        try:
+            deleted_reward = f'{reward[0]} {reward[1]}'
+            del self.commands_dict["chat rewards"][deleted_reward]
+            self.send_message(f'"{deleted_reward}" deleted')
+            self.write_commands()
+            return
+        except KeyError:
+            self.send_message(f'"{deleted_reward}" does not exist')
 
-    def spend_points(self, reward, points_spent):
+    def spend_points(self, reward):
         """
-        let a user spend points on a reward. if insufficient points, send a message telling the user.
+        let a user spend points on a reward. if insufficient points or mistyped reward, send a message telling the user.
         if sufficient points, send a message saying what the user bought and send a whisper to the channel owner.
+        the value passed to this function is also manipulated and made into a useful string in desired_reward
+        TODO: remove int coercions maybe when fixing add reward function
         """
-        pass
+
+        desired_reward = f'{reward[0]} {reward[1]}'
+        
+        try:
+            reward_cost = int(self.commands_dict["chat rewards"][desired_reward])
+        except KeyError:
+            self.send_message(f'{self.user}, that reward does not exist')
+            return
+        
+        user_points = int(self.chatters_dict[self.user]["points"])
+        
+        if user_points < reward_cost:
+            self.send_message(f"{self.user}, you don't have enough points for {reward}")
+            return
+
+        points_spent = reward_cost
+        self.chatters_dict[self.user]["points"] = user_points - reward_cost
+        
+        self.send_message(f'{self.user}, you spent {points_spent} on {desired_reward}. You now have {self.chatters_dict[self.user]["points"]} points.')
+        purchase_whisper = f'{self.user} purchased "{desired_reward}"'        
+        self.whisper(config.bot_channel, purchase_whisper)
+        return
 
     #further parsing and message handling
 
