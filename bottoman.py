@@ -4,13 +4,15 @@ import re
 import time
 
 import config
-from messagehandler import MessageHandler
+import messagehandler
 
 class TwitchBot:
 
     def __init__(self):
 
         self.s = self.open_socket()
+        self.reminder_counter = [0, time.time()]
+        self.active_game = False
         
     #functions for initializing bot, joining room  
 
@@ -40,6 +42,12 @@ class TwitchBot:
 
     #functions for parsing messages, running commands, and sending messages from the bot
 
+    def send_message(self, message):
+
+        messageTemp = f'PRIVMSG #{config.bot_channel} :{message}'
+        self.s.send(f'{messageTemp}\r\n'.encode('utf-8'))
+        print(f'Sent: {messageTemp}')
+
     def parse_message(self, line):
         """
         takes chat data from twitch and returns a clean user, message, and unix time to give to message handler
@@ -55,16 +63,31 @@ class TwitchBot:
             comment_time = int(time.time())
             return (user, message, comment_time)
 
-    def send_message(self, message):
+    def reminder_message(self):
+        """
+        send a message to chat at a regular interval based on time or number of messages
+        also checks to see if these values are set to 0 in config.py and dis
+        """
+        
+        post_number = self.reminder_counter[0]
+        reminder_timer = self.reminder_counter[1]
+        if (post_number >= config.reminder_posts and config.reminder_posts != 0) or ((time.time() - reminder_timer > config.reminder_seconds) and config.reminder_seconds != 0):
+            with open('commands.json', 'r') as f:
+                commands_dict = json.load(f)
+            if commands_dict["chat reminder"] == "none":
+                self.reminder_counter = [0, time.time()]
+                return
+            else:
+                self.send_message(commands_dict["chat reminder"])
+                self.reminder_counter = [0, time.time()]
+        return
 
-        messageTemp = f'PRIVMSG #{config.bot_channel} :{message}'
-        self.s.send(f'{messageTemp}\r\n'.encode('utf-8'))
-        print(f'Sent: {messageTemp}')
-
-    def whisper(self, user, message):
-
-        self.send_message('/w ' + user + ' ' + message)
-        print("Whispered to " + user + ': ' + message)
+    def instruction_handler(self, instruction):
+        if instruction == 'increment':
+            self.reminder_counter[0] += 1
+        elif instruction == 'start game':
+            self.active_game = True
+        return
 
     #main infinite loop
 
@@ -78,9 +101,11 @@ class TwitchBot:
             read_buffer = self.s.recv(2048).decode()
             user, message, comment_time = self.parse_message(read_buffer)
 
-            message_handler = MessageHandler(user, message, comment_time, self.s)
+            message_handler = messagehandler.MessageHandler(user, message, comment_time, self.s)
             instruction = message_handler.handle_message()
             
+            self.instruction_handler(instruction)
+            self.reminder_message()
 
 
 

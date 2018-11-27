@@ -27,7 +27,8 @@ class MessageHandler:
                                  "rewards",
                                  "addreward",
                                  "delreward",
-                                 "spend"]
+                                 "spend",
+                                 "setreminder"]
 
         self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
 
@@ -63,6 +64,25 @@ class MessageHandler:
 
         with open('chatters.json', 'w') as f:
             json.dump(self.chatters_dict, f)
+        return
+
+    def set_reminder(self, reminder_msg):
+        """
+        chat command that will change or disable a regular reminder message
+        """
+        if reminder_msg[0] == "none":
+            self.commands_dict["chat reminder"] = "none"
+            self.write_commands()
+            self.send_message("Reminder disabled")
+            return
+        try:
+            reminder_string = f'{reminder_msg[0]} {reminder_msg[1]}'
+        except IndexError:
+            self.send_message(f'Reminder message must be longer than one word')
+            return
+        self.commands_dict["chat reminder"] = reminder_string
+        self.write_commands()
+        self.send_message("Reminder message set")
         return
 
     #user related functions
@@ -182,6 +202,8 @@ class MessageHandler:
                 self.add_command(command[2], command[3])
             elif command[1] == "delcommand" and self.permission_hierarchy[permissions] >= 2:
                 self.del_command(command[2])
+            elif command[1] == "setreminder" and self.permission_hierarchy[permissions] >= 2:
+                self.set_reminder(command[2:])
             elif command[1] == "changeuser" and self.permission_hierarchy[permissions] >= 3:
                 self.change_permissions(command[2], command[3])
             elif command[1] == "give" and self.permission_hierarchy[permissions] >= 3:
@@ -228,7 +250,7 @@ class MessageHandler:
 
         commands_string = ""
         for command in self.commands_dict.keys():
-            if command != "chat rewards":    
+            if command != "chat rewards" and command != "reminder message":    
                 commands_string += f', !{command}'
 
         self.send_message(f'Currently available commands are: !points, !spend{commands_string}')
@@ -263,14 +285,18 @@ class MessageHandler:
         check for malformed command before accepting
         """
 
-        if isinstance(cost, int) == False:
+        try:
+            clean_cost = int(cost)
+            self.commands_dict["chat rewards"][reward] = clean_cost
+            self.send_message(f'Reward added: {reward} - {clean_cost}')
+            self.write_commands()
+            return
+
+        except ValueError:
             self.send_message('Malformed command. Please try again in the format "!addreward [cost in points] [reward]"')
             return
 
-        self.commands_dict["chat rewards"][reward] = cost
-        self.send_message(f'Reward added: {reward} - {cost}')
-        self.write_commands()
-
+        
     def delete_reward(self, reward):
         """
         check to see if the reward is in db then delete a reward from db and saves new db
@@ -321,6 +347,7 @@ class MessageHandler:
     def handle_message(self):
 
         separate = re.split('[ !]', self.message, 3)
+        bot_instruction = ''
         self.check_user()
         self.add_points()
 
@@ -334,11 +361,12 @@ class MessageHandler:
                 pass
         elif self.message[0] == "?":
             pass
+            bot_instruction = 'start game'
         else:
-            pass
+            bot_instruction = 'increment'
 
         print(f'{self.user} wrote: {self.message} at {self.comment_time}')
         self.write_chatters()
-        return "yeah"
+        return bot_instruction
 
 
