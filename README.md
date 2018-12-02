@@ -58,7 +58,7 @@ There are four levels of permissions: admin, moderator, games, and none. When yo
 
 Placeholder
 
-<h2>Commands Anyone Can Use<h2>
+<h2>Commands Anyone Can Use</h2>
 
 <b>!commands</b> - Lists all available commands
 
