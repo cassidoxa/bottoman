@@ -4,8 +4,8 @@ PORT = 6667
 #channel and authentication info
 
 token = "oauth:"
-bot_name = ""
-bot_channel = ""
+bot_name = "bottoman"
+bot_channel = "cassidoxa"
 join_msg = "VoHiYo"
 
 #points options

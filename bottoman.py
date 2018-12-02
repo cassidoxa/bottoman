@@ -94,16 +94,21 @@ class TwitchBot:
     def run_time(self):
         """
         recieves data from twitch, parses it, gives individual messages to message handler for further processing
-        the message handler can return an instruction to the bot in the "instruction" variable. 
+        the message handler can return an instruction to the bot in the "instruction" variable.
+        checks if there is an active game and handles messages differently while game is running until game stops
         """
 
         while True:
             read_buffer = self.s.recv(2048).decode()
             user, message, comment_time = self.parse_message(read_buffer)
 
-            message_handler = messagehandler.MessageHandler(user, message, comment_time, self.s)
-            instruction = message_handler.handle_message()
+            if self.active_game == False:
+                message_handler = messagehandler.MessageHandler(user, message, comment_time, self.s, self.active_game)
+                instruction = message_handler.handle_message()
             
+            elif self.active_game == True:
+                pass
+
             self.instruction_handler(instruction)
             self.reminder_message()
 

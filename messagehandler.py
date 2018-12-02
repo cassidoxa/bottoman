@@ -6,13 +6,14 @@ import config
 
 class MessageHandler:
 
-    def __init__(self, user, message, comment_time, s):
+    def __init__(self, user, message, comment_time, s, active_game):
 
         self.user = user.lower()
         self.permissions = ""
         self.message = message
         self.comment_time = comment_time
         self.s = s
+        self.active_game = active_game
 
         self.chatters_dict = self.load_chatters('chatters.json')
         self.commands_dict = self.load_commands('commands.json')
@@ -29,6 +30,7 @@ class MessageHandler:
                                  "delreward",
                                  "spend",
                                  "setreminder"]
+        self.games_list = ["gtbk", "meateo"]
 
         self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
 
@@ -349,7 +351,9 @@ class MessageHandler:
         separate = re.split('[ !]', self.message, 3)
         bot_instruction = ''
         self.check_user()
-        self.add_points()
+
+        if self.active_game == True:
+            pass
 
         if self.message[0] == "!":
             command = self.message[1:].lower()
@@ -359,14 +363,25 @@ class MessageHandler:
                 self.send_message(self.commands_dict[command])
             elif separate[1] not in self.commands_dict:
                 pass
+        
         elif self.message[0] == "?":
-            pass
-            bot_instruction = 'start game'
-        else:
-            bot_instruction = 'increment'
+            command = self.message[1:].lower()
+            if separate[1] == "start":
+                games.start_game(separate[2])
+                bot_instruction = 'start game'
+            elif separate[1] == "stop":
+                games.end_game
+                bot_instruction = "stop game"
+            elif separate[1] in self.games_list:
+                games.decide_winner(separate[2])
+        
+  
 
         print(f'{self.user} wrote: {self.message} at {self.comment_time}')
+        #print(active_game)
         self.write_chatters()
+
+        bot_instruction = "increment" #this will be structured differently later
         return bot_instruction
 
 
