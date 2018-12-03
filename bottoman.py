@@ -13,6 +13,7 @@ class TwitchBot:
         self.s = self.open_socket()
         self.reminder_counter = [0, time.time()]
         self.active_game = False
+        self.points_toggle = True
         
     #functions for initializing bot, joining room  
 
@@ -82,11 +83,16 @@ class TwitchBot:
                 self.reminder_counter = [0, time.time()]
         return
 
-    def instruction_handler(self, instruction):
-        if instruction == 'increment':
+    def instruction_handler(self, instructions):
+        if "increment" in instructions:
             self.reminder_counter[0] += 1
-        elif instruction == 'start game':
-            self.active_game = True
+        
+        if "ptoggle on" in instructions:
+            self.points_toggle = True
+
+        if "ptoggle off" in instructions:
+            self.points_toggle = False
+
         return
 
     #main infinite loop
@@ -103,8 +109,9 @@ class TwitchBot:
             user, message, comment_time = self.parse_message(read_buffer)
 
             if self.active_game == False:
-                message_handler = messagehandler.MessageHandler(user, message, comment_time, self.s, self.active_game)
+                message_handler = messagehandler.MessageHandler(user, message, comment_time, self.s, self.active_game, self.points_toggle)
                 instruction = message_handler.handle_message()
+                print(instruction) #
             
             elif self.active_game == True:
                 pass

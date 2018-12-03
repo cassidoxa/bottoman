@@ -34,11 +34,11 @@ After you've completed the previous steps, you'll be able to activate and run th
 
 <h1>Bot Permissions And Commands</h1>
 
-There are four levels of permissions: admin, moderator, games, and none. When you first run the bot, it will ask for your twitch user name and give you admin permissions, allowing you to run any command, before the bot joins your chat for the first time. Moderators can add and delete commands as well as change the reminder message and start games. People with the games permission can only start, stop, and record information about games. The permissions system is designed such that every level of permissions also has the permissions of the levels below it.
+There are four levels of permissions: admin, mod, games, and none. When you first run the bot, it will ask for your twitch user name and give you admin permissions, allowing you to run any command, before the bot joins your chat for the first time. Moderators can add and delete commands as well as change the reminder message and start games. People with the games permission can only start, stop, and record information about games. The permissions system is designed such that every level of permissions also has the permissions of the levels below it.
 
 <h2>Admin Commands</h2>
 
-<b>!changeuser</b> *(user)* *(permissions)* - Gives a user the desired permissions. *ex: !changuser cassidoxa moderator*
+<b>!changeuser</b> *(user)* *(permissions)* - Gives a user the desired permissions. *ex: !changuser cassidoxa mod*
 
 <b>!addreward</b> *(cost)* *(reward)* - Adds a reward that will be displayed by the !rewards command. The first argument should be a number, the cost in points, and the second argument is a text description of the reward. *ex: !addreward 9999 One hour of play*
 

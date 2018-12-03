@@ -1,19 +1,24 @@
 import json
 import time
 import re
+import sys
+import datetime as d
 
 import config
 
 class MessageHandler:
 
-    def __init__(self, user, message, comment_time, s, active_game):
+    def __init__(self, user, message, comment_time, s, active_game, points_toggle):
 
         self.user = user.lower()
-        self.permissions = ""
         self.message = message
         self.comment_time = comment_time
         self.s = s
         self.active_game = active_game
+        self.points_toggle = points_toggle
+
+        self.permissions = ""
+        self.bot_instructions = []
 
         self.chatters_dict = self.load_chatters('chatters.json')
         self.commands_dict = self.load_commands('commands.json')
@@ -29,7 +34,11 @@ class MessageHandler:
                                  "addreward",
                                  "delreward",
                                  "spend",
-                                 "setreminder"]
+                                 "setreminder",
+                                 "shutdown",
+                                 "pointson",
+                                 "pointsoff",
+                                 "backup"]
         self.games_list = ["gtbk", "meateo"]
 
         self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
@@ -67,6 +76,22 @@ class MessageHandler:
         with open('chatters.json', 'w') as f:
             json.dump(self.chatters_dict, f)
         return
+
+    def backup_chat_data(self):
+        """writes backup version of chatters and commands dbs"""
+ 
+        date_string = d.datetime.today().strftime('-%d-%m-%y')
+
+       
+        with open(f'chatters{date_string}.json', 'w') as f:
+            json.dump(self.chatters_dict, f)
+
+        with open(f'commands{date_string}.json', 'w') as g:
+            json.dump(self.commands_dict, g)
+
+        self.send_message(f'Backup successful')
+
+        return   
 
     def set_reminder(self, reminder_msg):
         """
@@ -153,30 +178,50 @@ class MessageHandler:
 
     def give_points(self, user, added_points):
 
-        if user in self.chatters_dict.keys():
-            new_total = self.chatters_dict[user]["points"] + int(added_points)
-            self.chatters_dict[user]["points"] = new_total
-            self.send_message(f'{self.user} gave {user} {added_points} points')
+        try:
+            if user in self.chatters_dict.keys():
+                new_total = self.chatters_dict[user]["points"] + int(added_points)
+                self.chatters_dict[user]["points"] = new_total
+                self.send_message(f'{self.user} gave {user} {added_points} points')
 
-        elif user not in self.chatters_dict.keys():
-            self.add_user(user, added_points)
+            elif user not in self.chatters_dict.keys():
+                self.add_user(user, added_points)
+
+        except ValueError:
+            self.send_message(f'Please use a number with the !give command')
 
         return
 
     def take_points(self, user, removed_points):
 
-        if user in self.chatters_dict.keys():
-            new_total = self.chatters_dict[user]["points"] - int(removed_points)
-            if new_total < 0:
-                self.chatters_dict[user]["points"] = 0
-            else:
-                self.chatters_dict[user]["points"] = new_total
+        try:
+            if user in self.chatters_dict.keys():
+                new_total = self.chatters_dict[user]["points"] - int(removed_points)
+                if new_total < 0:
+                    self.chatters_dict[user]["points"] = 0
+                else:
+                    self.chatters_dict[user]["points"] = new_total
 
-            self.send_message(f'{self.user} took {removed_points} points from {user}. {user} now has {self.chatters_dict[user]["points"]} points.')
+                self.send_message(f'{self.user} took {removed_points} points from {user}. {user} now has {self.chatters_dict[user]["points"]} points.')
 
-        elif user not in self.chatters_dict.keys():
-            return
+            elif user not in self.chatters_dict.keys():
+                return
 
+        except ValueError:
+            self.send_message(f'Please use a number with the !take command') 
+
+        return
+
+    def ptoggle_on(self):
+        """turns point toggle on. When toggle is on, users will earn points for sending chat messages"""
+
+        self.bot_instructions.append("ptoggle on")
+        return
+
+    def ptoggle_off(self):
+        """turns point toggle off. When toggle is off, users will not earn points for sending chat messages"""
+
+        self.bot_instructions.append("ptoggle off")
         return
 
     #command related functions
@@ -216,7 +261,15 @@ class MessageHandler:
                 self.add_reward(command[3], command[2])
             elif command[1] == "delreward" and self.permission_hierarchy[permissions] >= 3:
                 self.delete_reward(command[2:])
-
+            elif command[1] == "pointson" and self.permission_hierarchy[permissions] >= 3:
+                self.ptoggle_on()
+            elif command[1] == "pointsoff" and self.permission_hierarchy[permissions] >= 3:
+                self.ptoggle_off()
+            elif command[1] == "backup" and self.permission_hierarchy[permissions] >= 3:
+                self.backup_chat_data()
+            elif command[1] == "shutdown" and self.permission_hierarchy[permissions] >= 3:
+                self.send_message(config.exit_msg)
+                sys.exit()
         except IndexError:
             self.send_message(f'Malformed command. Please try again')
 
@@ -349,9 +402,10 @@ class MessageHandler:
     def handle_message(self):
 
         separate = re.split('[ !]', self.message, 3)
-        bot_instruction = ''
+
         self.check_user()
-        self.add_points()
+        if self.points_toggle == True:
+            self.add_points()
 
         if self.active_game == True:
             pass
@@ -382,7 +436,7 @@ class MessageHandler:
         #print(active_game)
         self.write_chatters()
 
-        bot_instruction = "increment" #this will be structured differently later
-        return bot_instruction
+        self.bot_instructions.append("increment") #this will be structured differently later
+        return self.bot_instructions
 
 
