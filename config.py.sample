@@ -6,7 +6,9 @@ PORT = 6667
 token = "oauth:"
 bot_name = "bottoman"
 bot_channel = "cassidoxa"
+
 join_msg = "VoHiYo"
+exit_msg = "Goodbye"
 
 #points options
 
