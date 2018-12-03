@@ -111,7 +111,6 @@ class TwitchBot:
             if self.active_game == False:
                 message_handler = messagehandler.MessageHandler(user, message, comment_time, self.s, self.active_game, self.points_toggle)
                 instruction = message_handler.handle_message()
-                print(instruction) #
             
             elif self.active_game == True:
                 pass

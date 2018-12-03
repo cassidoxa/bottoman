@@ -33,7 +33,7 @@ class MessageHandler:
                                  "rewards",
                                  "addreward",
                                  "delreward",
-                                 "spend",
+                                 "buy",
                                  "setreminder",
                                  "shutdown",
                                  "pointson",
@@ -241,7 +241,7 @@ class MessageHandler:
                 self.get_points()
             elif command[1] == "rewards":
                 self.list_rewards()
-            elif command[1] == "spend":
+            elif command[1] == "buy":
                 self.spend_points(command[2:])
             elif command[1] == "commands":
                 self.list_commands()
@@ -308,7 +308,7 @@ class MessageHandler:
             if command != "chat rewards" and command != "chat reminder":    
                 commands_string += f', !{command}'
 
-        self.send_message(f'Currently available commands are: !points, !spend{commands_string}')
+        self.send_message(f'Available commands: !points, !rewards, !buy{commands_string}')
         return
 
     def write_commands(self):
@@ -375,7 +375,7 @@ class MessageHandler:
         try:
             desired_reward = f'{reward[0]} {reward[1]}'
         except IndexError:
-            self.send_message(f'Type !rewards to see available rewards. If you have enough !points, type the reward after !spend to purchase it')
+            self.send_message(f'Type !rewards to see available rewards. If you have enough !points, type the reward after !buy to purchase it')
             return
         try:
             reward_cost = int(self.commands_dict["chat rewards"][desired_reward])
