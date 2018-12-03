@@ -252,7 +252,7 @@ class MessageHandler:
 
         commands_string = ""
         for command in self.commands_dict.keys():
-            if command != "chat rewards" and command != "reminder message":    
+            if command != "chat rewards" and command != "chat reminder":    
                 commands_string += f', !{command}'
 
         self.send_message(f'Currently available commands are: !points, !spend{commands_string}')
