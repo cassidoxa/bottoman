@@ -351,6 +351,7 @@ class MessageHandler:
         separate = re.split('[ !]', self.message, 3)
         bot_instruction = ''
         self.check_user()
+        self.add_points()
 
         if self.active_game == True:
             pass
@@ -364,16 +365,16 @@ class MessageHandler:
             elif separate[1] not in self.commands_dict:
                 pass
         
-        elif self.message[0] == "?":
-            command = self.message[1:].lower()
-            if separate[1] == "start":
-                games.start_game(separate[2])
-                bot_instruction = 'start game'
-            elif separate[1] == "stop":
-                games.end_game
-                bot_instruction = "stop game"
-            elif separate[1] in self.games_list:
-                games.decide_winner(separate[2])
+#        elif self.message[0] == "?":
+#            command = self.message[1:].lower()
+#            if separate[1] == "start":
+#                games.start_game(separate[2])
+#                bot_instruction = 'start game'
+#            elif separate[1] == "stop":
+#                games.end_game
+#                bot_instruction = "stop game"
+#            elif separate[1] in self.games_list:
+#                games.decide_winner(separate[2])
         
   
 
