@@ -1,6 +1,0 @@
-{
- "example user" : { "permissions" : "none",
-                         "points" : 0 ,
-                         "comment_time" : 0
-                       }
-}
