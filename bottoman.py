@@ -1,10 +1,10 @@
 import socket
-import json
 import re
 import time
+import sqlite3
 
 import config
-import messagehandler
+import messagehandler as mh
 
 class TwitchBot:
 
@@ -14,13 +14,14 @@ class TwitchBot:
         self.reminder_counter = [0, time.time()]
         self.active_game = False
         self.points_toggle = True
-        
+        self.dbmgr = DatabaseManager('db/test.db')
+
     #functions for initializing bot, joining room  
 
     def open_socket(self):
 
         self.s = socket.socket()
-        self.s.connect((config.HOST, config.PORT))
+        self.s.connect(('irc.twitch.tv', 6667))
         self.s.send(f'PASS {config.token} \r\n'.encode('utf-8'))
         self.s.send(f'NICK {config.bot_name} \r\n'.encode('utf-8'))
         self.s.send(f'JOIN #{config.bot_channel} \r\n'.encode('utf-8'))
@@ -40,7 +41,6 @@ class TwitchBot:
                 if "End of /NAMES list" in line:
                     loading = True
 
-
     #functions for parsing messages, running commands, and sending messages from the bot
 
     def send_message(self, message):
@@ -49,9 +49,14 @@ class TwitchBot:
         self.s.send(f'{messageTemp}\r\n'.encode('utf-8'))
         print(f'Sent: {messageTemp}')
 
+    def whisper(self, user, message):
+
+        self.send_message(f'/w {user} {message}')
+        print(f'Whispered to {user} : {message}')
+
     def parse_message(self, line):
         """
-        takes chat data from twitch and returns a clean user, message, and unix time to give to message handler
+        takes chat data from twitch and returns a user, message, and unix time to give to message handler
         """
         
         separate = re.split('[:!]', line, 3)
@@ -61,8 +66,8 @@ class TwitchBot:
         else:
             user = separate[1]
             message = separate[3].rstrip()
-            comment_time = int(time.time())
-            return (user, message, comment_time)
+            message_time = int(time.time())
+            return (user, message, message_time)
 
     def reminder_message(self):
         """
@@ -72,26 +77,37 @@ class TwitchBot:
         
         post_number = self.reminder_counter[0]
         reminder_timer = self.reminder_counter[1]
+
         if (post_number >= config.reminder_posts and config.reminder_posts != 0) or ((time.time() - reminder_timer > config.reminder_seconds) and config.reminder_seconds != 0):
-            with open('commands.json', 'r') as f:
-                commands_dict = json.load(f)
-            if commands_dict["chat reminder"] == "none":
+            reminder_msg = self.dbmgr.query("SELECT config_text FROM config WHERE config_option=?", ('reminder_message',)).fetchone()[0]
+            if reminder_msg == "none":
                 self.reminder_counter = [0, time.time()]
                 return
             else:
-                self.send_message(commands_dict["chat reminder"])
+                self.send_message(reminder_msg)
                 self.reminder_counter = [0, time.time()]
         return
 
     def instruction_handler(self, instructions):
-        if "increment" in instructions:
-            self.reminder_counter[0] += 1
-        
-        if "ptoggle on" in instructions:
-            self.points_toggle = True
 
-        if "ptoggle off" in instructions:
-            self.points_toggle = False
+        try:
+            if 'increment' in instructions[0]:
+                self.reminder_counter[0] += 1
+    
+            if 'ptoggle on' in instructions[0]:
+                self.points_toggle = True
+
+            if 'ptoggle off' in instructions[0]:
+                self.points_toggle = False
+
+            if instructions[1]['sendmsg'] != None:
+                self.send_message(instructions[1]['sendmsg']) 
+        
+            if instructions[1]['sendwhisper'] != None:
+                self.whisper(instructions[1]['sendwhisper'][0], instructions[1]['sendwhisper'][1])
+
+        except TypeError:
+            pass
 
         return
 
@@ -106,10 +122,10 @@ class TwitchBot:
 
         while True:
             read_buffer = self.s.recv(2048).decode()
-            user, message, comment_time = self.parse_message(read_buffer)
+            msg_info = self.parse_message(read_buffer)
 
             if self.active_game == False:
-                message_handler = messagehandler.MessageHandler(user, message, comment_time, self.s, self.active_game, self.points_toggle)
+                message_handler = mh.MessageHandler(msg_info, self.active_game, self.points_toggle, self.dbmgr)
                 instruction = message_handler.handle_message()
             
             elif self.active_game == True:
@@ -118,5 +134,19 @@ class TwitchBot:
             self.instruction_handler(instruction)
             self.reminder_message()
 
+class DatabaseManager:
+    def __init__(self, db):
+        self.conn = sqlite3.connect(db)
+        self.c = self.conn.cursor()
 
+    def query(self, arg, tup=()):
+        self.c.execute(arg, tup)
+        return self.c
 
+    def write(self, arg, tup=()):
+        self.c.execute(arg, tup)
+        self.conn.commit()
+        return self.c
+
+    def __del__(self):
+        self.conn.close()

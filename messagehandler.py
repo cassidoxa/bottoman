@@ -1,28 +1,26 @@
-import json
-import time
+import requests
 import re
 import sys
-import datetime as d
 
 import config
 
+
+
 class MessageHandler:
 
-    def __init__(self, user, message, comment_time, s, active_game, points_toggle):
+    def __init__(self, msg_info, active_game, points_toggle, dbmgr):
 
-        self.user = user.lower()
-        self.message = message
-        self.comment_time = comment_time
-        self.s = s
-        self.active_game = active_game
+        self.user = msg_info[0]
+        self.user_display = ''
+        self.message = msg_info[1] 
+        self.message_time = msg_info[2]
+        self.active_game = active_game 
         self.points_toggle = points_toggle
+        self.dbmgr = dbmgr
 
-        self.permissions = ""
-        self.bot_instructions = []
-
-        self.chatters_dict = self.load_chatters('chatters.json')
-        self.commands_dict = self.load_commands('commands.json')
-
+        self.permissions = ''
+        self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
+        self.games_list = ["gtbk", "meateo"]
         self.dynamic_commands = ["changeuser",
                                  "addcommand",
                                  "delcommand",
@@ -37,102 +35,84 @@ class MessageHandler:
                                  "setreminder",
                                  "shutdown",
                                  "pointson",
-                                 "pointsoff",
-                                 "backup"]
-        self.games_list = ["gtbk", "meateo"]
+                                 "pointsoff"]
 
-        self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
+        self.bot_instructions = [[], {'sendmsg': None, 'sendwhisper': None}]        
 
-    def send_message(self, message):
-
-        messageTemp = f'PRIVMSG #{config.bot_channel} :{message}'
-        self.s.send(f'{messageTemp}\r\n'.encode('utf-8'))
-        print(f'Sent: {messageTemp}')
-
-    def whisper(self, user, message):
-
-        self.send_message(f'/w {user} {message}')
-        print(f'Whispered to {user} : {message}')
-
-    #functions for loading and saving persistent data
-
-    def load_chatters(self, chatters_file):
-
-        with open(chatters_file, 'r') as f:
-            chatters_dict = json.load(f)
-        return chatters_dict
-
-    def load_commands(self, command_file):
-        with open(command_file, 'r') as f:
-            command_dict = json.load(f)
-        return command_dict
-
-    def write_chatters(self):
-        """
-        open chatters db and write changes
-        should only call this function at the end of every message handling cycle to avoid extraneous writes
-        """
-
-        with open('chatters.json', 'w') as f:
-            json.dump(self.chatters_dict, f)
-        return
-
-    def backup_chat_data(self):
-        """writes backup version of chatters and commands dbs"""
- 
-        date_string = d.datetime.today().strftime('-%d-%m-%y')
-
-       
-        with open(f'chatters{date_string}.json', 'w') as f:
-            json.dump(self.chatters_dict, f)
-
-        with open(f'commands{date_string}.json', 'w') as g:
-            json.dump(self.commands_dict, g)
-
-        self.send_message(f'Backup successful')
-
-        return   
+        
 
     def set_reminder(self, reminder_msg):
         """
         chat command that will change or disable a regular reminder message
         """
-        if reminder_msg[0] == "none":
-            self.commands_dict["chat reminder"] = "none"
-            self.write_commands()
-            self.send_message("Reminder disabled")
+        if reminder_msg[0] == 'none':
+            self.dbmgr.write("UPDATE config SET config_text=? WHERE config_option=?", ('none', 'reminder_message'))
+            self.send_message(f'Reminder disabled')
             return
-        try:
-            reminder_string = f'{reminder_msg[0]} {reminder_msg[1]}'
-        except IndexError:
-            self.send_message(f'Reminder message must be longer than one word')
-            return
-        self.commands_dict["chat reminder"] = reminder_string
-        self.write_commands()
+        else:
+            pass
+
+        reminder_msg = ' '.join(reminder_msg).rstrip()
+
+        self.dbmgr.write("UPDATE config SET config_text=? WHERE config_option=?", (reminder_msg, 'reminder_message'))
         self.send_message("Reminder message set")
         return
 
+    #functions for sending messages to chat and whispering.
+    #these functions pass data to the main bottoman module to be sent/whispered
+
+    def send_message(self, message):
+        self.bot_instructions[1]['sendmsg'] = message
+
+    def whisper(self, recipient, whisper):
+        self.bot_instructions[1]['sendwhisper'] = (recipient, whisper)
+
     #user related functions
 
-    def add_user(self, added_user, init_points):
-        self.chatters_dict[added_user] = { "permissions" : "none",
-                                           "points" : init_points,
-                                           "comment_time" : int(time.time())
-                                         }
+    def add_user(self, user_id, user_lower, user_display, init_points=1):
+        self.dbmgr.write("INSERT INTO chatters VALUES (?,?,?,?,?,?)", (user_id, user_lower, user_display, 'none', init_points, self.message_time)) 
         return
+
+    def get_user_id_display(self, user):
+        """
+        uses twitch's API to get a user's token with their (case insensitive)
+        user name
+        """
+
+        print(f'Ran get_user_id_display() - debug')
+        token = config.token[6:]
+        header = {"Authorization": f'Bearer {token}'}
+        response = requests.get(f'https://api.twitch.tv/helix/users?login={user}', headers=header).json()
+        
+        return (response['data'][0]['id'], response['data'][0]['display_name'])
 
     def check_user(self):
         """
-        check if user in flat db. if not, add them. check and set user permissions for instance
+        check if user in db. if not, retrieve twitch user id via API and add them or
+        change name if there's a duplicate id. check and set user permissions
+        for message being handled 
         """
 
-        if self.user not in self.chatters_dict:
-            self.add_user(self.user, 1)
+        user_list = [user[0] for user in self.dbmgr.query("SELECT user_lower FROM chatters")]
+
+        if self.user in user_list:
+            self.permissions = self.dbmgr.query("SELECT permissions FROM chatters WHERE user_lower=?", (self.user,)).fetchone()[0]
+            self.user_display = self.dbmgr.query("SELECT user_display FROM chatters WHERE user_lower=?", (self.user,)).fetchone()[0]
             return
 
-        else:
-            self.permissions = self.chatters_dict[self.user]["permissions"]
-            return
+        elif self.user not in user_list:
+            user_id, self.user_display = self.get_user_id_display(self.user)
+            user_id_list = [id[0] for id in self.dbmgr.query("SELECT user_id FROM chatters")]
+
+            if user_id not in user_id_list:
+                self.add_user(user_id, self.user, self.user_display)
+                self.permissions = 'none'
+
+            elif user_id in user_id_list:
+                self.permissions = self.dbmgr.query("SELECT permissions FROM chatters WHERE user_id=?", (user_id,)).fetchone()[0]
+                self.dbmgr.write("UPDATE chatters SET user_lower=?, user_display=? WHERE user_id=?", (self.user, self.user_display, user_id,))
+                
+        return
 
     def add_points(self):
         """
@@ -140,23 +120,27 @@ class MessageHandler:
         the function for an admin to give a user a custom amount of points is give_points
         """
 
-        new_points = self.chatters_dict[self.user]['points'] + config.message_points
-        if (self.comment_time - self.chatters_dict[self.user]["comment_time"]) >= config.points_cooldown:
-            self.chatters_dict[self.user]["points"] = int(new_points)
-            self.chatters_dict[self.user]["comment_time"] = int(time.time())
-            return
+        old_time = self.dbmgr.query("SELECT message_time FROM chatters WHERE user_lower=?", (self.user,)).fetchone()[0]
+
+        if (self.message_time - old_time) >= config.points_cooldown:
+            self.dbmgr.write("UPDATE chatters SET points = points + ?, message_time=? WHERE user_lower=?", (config.message_points, self.message_time, self.user))
+
         else:
             return
+
+        return
 
     def get_points(self):
         """
         makes the bot send a message telling user how many points they have
         """
-
-        "send message to chat telling user how many points they have"
-        self.send_message(f'{self.user}, you have {self.chatters_dict[self.user]["points"]} points')
+        
+        points = self.dbmgr.query("SELECT points FROM chatters WHERE user_lower=?", (self.user,)).fetchone()[0]
+        self.send_message(f'{self.user}, you have {points} points')
+        return
 
     def change_permissions(self, changed_user, new_permissions):
+        """change an existing user's permission or add user to db with appropriate permissions"""
 
         if new_permissions not in self.permission_hierarchy.keys():
             self.send_message(f'"{new_permissions}" is not a valid user permissions setting')
@@ -164,77 +148,112 @@ class MessageHandler:
         else:
             pass
 
-        if self.permissions == "admin":
-            clean_user = changed_user.lower()
-            if clean_user not in self.chatters_dict:
-                self.add_user(clean_user, 0)
-                self.chatters_dict[clean_user]["permissions"] = new_permissions
-            else:
-                self.chatters_dict[clean_user]["permissions"] = new_permissions
-            self.send_message(f'{changed_user} had permissions changed to {new_permissions}')
+        try:
+            user_id_display = self.get_user_id_display(changed_user)
+        except IndexError:
+            self.send_message(f'Error adding new permissions for user "{changed_user}". Check spelling.')
             return
-        else:
-            return
+
+        user_id_list = [id[0] for id in self.dbmgr.query("SELECT user_id FROM chatters")]
+
+        if user_id_display[0] in user_id_list:
+            self.dbmgr.write("UPDATE chatters SET permissions=? WHERE user_id=?", (new_permissions, user_id_display[0]))
+            self.send_message(f'{user_id_display[1]} given "{new_permissions}" permissions')
+        elif user_id_display[0] not in user_id_list:
+            self.add_user(user_id_display[0], user_id_display[1].lower(), user_id_display[1])
+            self.dbmgr.write("UPDATE chatters SET permissions=? WHERE user_id=?", (new_permissions, user_id_display[0]))
+            self.send_message(f'{user_id_display[1]} given "{new_permissions}" permissions')
+
+        return
 
     def give_points(self, user, added_points):
+        """
+        admin chat command to give a user the specified number of points
+        if the user doesn't exist in db, try to add them to db
+        if user is not an active twitch account, send error message to chat
+        """
 
         try:
-            if user in self.chatters_dict.keys():
-                new_total = self.chatters_dict[user]["points"] + int(added_points)
-                self.chatters_dict[user]["points"] = new_total
-                self.send_message(f'{self.user} gave {user} {added_points} points')
-
-            elif user not in self.chatters_dict.keys():
-                self.add_user(user, added_points)
-
+            added_points = int(added_points)
         except ValueError:
-            self.send_message(f'Please use a number with the !give command')
+            self.send_message(f'Error: Must use an integer number with the !give command')
+            return
+
+        try:
+            user_id_display = self.get_user_id_display(user)
+        except IndexError:
+            self.send_message(f'Error giving points: Check spelling. This command is not case-sensitive')
+            return
+
+        database_check = self.dbmgr.query("SELECT * FROM chatters WHERE user_id=?", (user_id_display[0],)).fetchone()
+        if database_check == None:
+            self.add_user(user_id_display[0], user_id_display[1].lower(), user_id_display[1], added_points)
+            self.send_message(f'Gave {user_id_display[1]} {added_points} points')
+            return
+        else: 
+            self.dbmgr.write("UPDATE chatters SET points= points + ? WHERE user_id=?", (added_points, user_id_display[0],))
+            self.send_message(f'Gave {user_id_display[1]} {added_points} points')
 
         return
 
     def take_points(self, user, removed_points):
+        """Take specified number of points from existing user without allowing points to go below zero"""
 
         try:
-            if user in self.chatters_dict.keys():
-                new_total = self.chatters_dict[user]["points"] - int(removed_points)
-                if new_total < 0:
-                    self.chatters_dict[user]["points"] = 0
-                else:
-                    self.chatters_dict[user]["points"] = new_total
-
-                self.send_message(f'{self.user} took {removed_points} points from {user}. {user} now has {self.chatters_dict[user]["points"]} points.')
-
-            elif user not in self.chatters_dict.keys():
-                return
-
+            removed_points = int(removed_points)
         except ValueError:
-            self.send_message(f'Please use a number with the !take command') 
+            self.send_message(f'Error: Must use an integer with the !take command')
+            return
+
+        try:
+            user_id_display = self.get_user_id_display(user)
+        except IndexError:
+            self.send_message(f'Error removing points: Check spelling. This command is not case-sensitive')
+            return
+
+        current_points = self.dbmgr.query("SELECT points FROM chatters WHERE user_id=?", (user_id_display[0],)).fetchone()[0]
+
+        if current_points == None:
+            self.send_message(f'{user_id_display[1]} hasn\'t chatted in here yet')
+            return
+
+        else:
+            
+            user = user_id_display[1]
+            new_points = current_points - removed_points
+
+            if new_points >= 0:
+                self.dbmgr.write("UPDATE chatters SET points=? WHERE user_id=?", (new_points, user_id_display[0],))
+                self.send_message(f'{self.user_display} took {removed_points} from {user}. {user} now has {new_points}')
+            elif new_points < 0:
+                self.dbmgr.write("UPDATE chatters SET points=0 WHERE user_id=?", (user_id_display[0],))
+                self.send_message(f'{self.user_display} took {removed_points} from {user}. {user} now has 0 points')
 
         return
 
     def ptoggle_on(self):
         """turns point toggle on. When toggle is on, users will earn points for sending chat messages"""
 
-        self.bot_instructions.append("ptoggle on")
+        self.bot_instructions[0].append("ptoggle on")
         return
 
     def ptoggle_off(self):
         """turns point toggle off. When toggle is off, users will not earn points for sending chat messages"""
 
-        self.bot_instructions.append("ptoggle off")
+        self.bot_instructions[0].append("ptoggle off")
         return
 
     #command related functions
-    #the !bot command is a static command in the db that can be overwritten but has an initial message about bottoman
+    #the !bot command is a static text command in the db that can be overwritten but has an initial message about bottoman
 
     def dynamic_command(self, command):
         """
-        run commands that either have dynamic output or change some bot/user data. checks for correct permissions before running
+        run commands that either have dynamic output or change some bot/user data. checks for correct permissions before running.
         all dynamic commands except for games are hardcoded here and must be in the self.dynamic_commands list
         at the top of this module
         """
 
-        permissions = self.chatters_dict[self.user.lower()]["permissions"]
+        permissions = self.permissions
 
         try:
             if command[1] == "points":
@@ -265,10 +284,8 @@ class MessageHandler:
                 self.ptoggle_on()
             elif command[1] == "pointsoff" and self.permission_hierarchy[permissions] >= 3:
                 self.ptoggle_off()
-            elif command[1] == "backup" and self.permission_hierarchy[permissions] >= 3:
-                self.backup_chat_data()
             elif command[1] == "shutdown" and self.permission_hierarchy[permissions] >= 3:
-                self.send_message(config.exit_msg)
+                self.send_message(f'{config.exit_msg}')
                 sys.exit()
         except IndexError:
             self.send_message(f'Malformed command. Please try again')
@@ -276,25 +293,36 @@ class MessageHandler:
         return
 
     def add_command(self, new_command, command_text):
+        """Add a static text command to db"""
+        
+        command_list = [command[0] for command in self.dbmgr.query("SELECT command FROM commands")]
+        new_command = new_command.lower()
 
         if new_command in self.dynamic_commands:
             self.send_message(f'"{new_command}" is a reserved command')
-        else:
-            self.commands_dict[new_command] = str(command_text).lower()
-            self.send_message(f'{self.user} added the command "!{new_command.lower()}"')
-            self.write_commands()
+            return
+
+        if new_command in command_list:
+            self.dbmgr.write("UPDATE commands SET command=?, command_text=? WHERE command=?", (new_command, command_text, new_command))
+            self.send_message(f'Added command !{new_command}')
+        elif new_command not in command_list:
+            self.dbmgr.write("INSERT INTO commands VALUES(?, ?)", (new_command, command_text,))
+            self.send_message(f'Added command !{new_command}')
 
         return
 
     def del_command(self, deleted_command):
+        """Delete a static text command from db"""
 
-        try:
-            del self.commands_dict[deleted_command]
-            self.send_message(f'{self.user} deleted the command "!{deleted_command.lower()}"')
-            self.write_commands()
-        except KeyError:
-            self.send_message(f'"{deleted_command.lower()}" command does not exist')
+        command_list = [command[0] for command in self.dbmgr.query("SELECT command FROM commands")]
+        deleted_command = deleted_command.lower()
 
+        if deleted_command not in command_list:
+            self.send_message(f'!{deleted_command} not found in commands database')
+        elif deleted_command in command_list:
+            self.dbmgr.write("DELETE FROM commands WHERE command=?", (deleted_command,))
+            self.send_message(f'!{deleted_command} command deleted')
+        
         return
 
     def list_commands(self):
@@ -303,18 +331,21 @@ class MessageHandler:
         so the constructed string will start with a comma as such: ", "
         """
 
+        command_list = [command[0] for command in self.dbmgr.query("SELECT command FROM commands")]
         commands_string = ""
-        for command in self.commands_dict.keys():
-            if command != "chat rewards" and command != "chat reminder":    
+        reward_list = [reward[0] for reward in self.dbmgr.query("SELECT * FROM rewards")]
+        
+        if command_list == [] and reward_list == []:
+            self.send_message(f'Available commands: !bot, !points')
+        elif len(command_list) > 0 and reward_list == []:
+            for command in command_list:
                 commands_string += f', !{command}'
+            self.send_message(f'Available commands: !points{commands_string}')
+        else:
+            for command in command_list:
+                commands_string += f', !{command}'
+            self.send_message(f'Available commands: !points, !rewards, !buy{commands_string}')
 
-        self.send_message(f'Available commands: !points, !rewards, !buy{commands_string}')
-        return
-
-    def write_commands(self):
-
-        with open('commands.json', 'w') as f:
-            json.dump(self.commands_dict, f)
         return
 
     #rewards functions
@@ -325,46 +356,58 @@ class MessageHandler:
         """
         list currently available rewards in chat for users to see
         """
-        if any(self.commands_dict["chat rewards"]) == False:
-            self.send_message(f'No rewards currently available')
-            return
 
         rewards_string = ""
-        for reward, cost in self.commands_dict["chat rewards"].items():
-            rewards_string += f'{reward} - {cost}, '
-        self.send_message(rewards_string[0:-2])
+        reward_list = [reward for reward in self.dbmgr.query("SELECT * FROM rewards").fetchall()]
 
-    def add_reward(self, reward, cost):
+        if reward_list == []:
+            self.send_message(f'No rewards currently available')
+        else:
+            for reward, cost in reward_list:
+                rewards_string += f'{reward} - {cost}, '
+            self.send_message(rewards_string[0:-2])
+
+        return
+
+    def add_reward(self, new_reward, cost):
         """
         add a reward to db that users can cash in points for. If reward exists, overwrite it.
         check for malformed command before accepting
         """
 
         try:
-            clean_cost = int(cost)
-            self.commands_dict["chat rewards"][reward] = clean_cost
-            self.send_message(f'Reward added: {reward} - {clean_cost}')
-            self.write_commands()
-            return
-
+            cost = int(cost)
         except ValueError:
             self.send_message('Malformed command. Please try again in the format "!addreward [cost in points] [reward]"')
             return
 
+        new_reward = new_reward.rstrip()
+        reward_list = [reward[0] for reward in self.dbmgr.query("SELECT reward FROM rewards")]
+        
+        if new_reward not in reward_list:
+            self.dbmgr.write("INSERT INTO rewards VALUES (?, ?)", (new_reward, cost,))
+            self.send_message(f'Added reward: "{new_reward} - {cost}"')
+        elif new_reward in reward_list:
+            self.dbmgr.write("UPDATE rewards SET reward=?, cost=? WHERE reward=?", (new_reward, cost, new_reward))
+            self.send_message(f'Added reward: "{new_reward} - {cost}"')
+
+        return
         
     def delete_reward(self, reward):
         """
         check to see if the reward is in db then delete a reward from db and saves new db
         send message to chat about the deleted reward. function first manipulates the passed value to access dict key
         """
-        try:
-            deleted_reward = f'{reward[0]} {reward[1]}'
-            del self.commands_dict["chat rewards"][deleted_reward]
-            self.send_message(f'"{deleted_reward}" deleted')
-            self.write_commands()
-            return
-        except KeyError:
-            self.send_message(f'"{deleted_reward}" does not exist')
+
+        reward_list = [reward[0] for reward in self.dbmgr.query("SELECT reward FROM rewards")]
+
+        if reward in reward_list:
+            self.dbmgr.write("DELETE FROM rewards WHERE reward=?", (reward))
+            self.send_message(f'"{reward}" deleted')
+        elif reward not in reward_list:
+            self.send_message(f'Error deleting reward. Check spelling. Command is case-sensitive')
+
+        return
 
     def spend_points(self, reward):
         """
@@ -372,34 +415,44 @@ class MessageHandler:
         if sufficient points, send a message saying what the user bought and send a whisper to the channel owner.
         the value passed to this function is also manipulated and made into a useful string in desired_reward
         """
-        try:
-            desired_reward = f'{reward[0]} {reward[1]}'
-        except IndexError:
+        
+        desired_reward = ' '.join(reward)
+
+        if desired_reward == '':
             self.send_message(f'Type !rewards to see available rewards. If you have enough !points, type the reward after !buy to purchase it')
             return
-        try:
-            reward_cost = int(self.commands_dict["chat rewards"][desired_reward])
-        except KeyError:
-            self.send_message(f'{self.user}, that reward does not exist')
+        
+
+        #check if reward exists. If it does, get user points and see if they have enough.
+        reward_list = [reward[0] for reward in self.dbmgr.query("SELECT * FROM rewards").fetchall()]
+
+        if desired_reward not in reward_list:
+            self.send_message(f'{self.user}, that reward does not exist. Check spelling and keep in mind that rewards are case sensitive')
             return
-        
-        user_points = int(self.chatters_dict[self.user]["points"])
-        
+        elif desired_reward in reward_list:
+            reward_cost = self.dbmgr.query("SELECT cost FROM rewards WHERE reward=?", (desired_reward,)).fetchone()[0]
+
+        user_points = self.dbmgr.query("SELECT points FROM chatters WHERE user_lower=?", (self.user,)).fetchone()[0]
+
         if user_points < reward_cost:
-            self.send_message(f"{self.user}, you don't have enough points for {reward}")
+            self.send_message(f'{self.user_display}, you don\'t have enough points for "{desired_reward}"')
             return
 
-        points_spent = reward_cost
-        self.chatters_dict[self.user]["points"] = user_points - reward_cost
-        
-        self.send_message(f'{self.user}, you spent {points_spent} on {desired_reward}. You now have {self.chatters_dict[self.user]["points"]} points.')
-        purchase_whisper = f'{self.user} purchased "{desired_reward}"'        
-        self.whisper(config.bot_channel, purchase_whisper)
-        return
+        elif user_points >= reward_cost:
+            new_points = user_points - reward_cost
+            purchase_whisper = f'{self.user_display} purchased "{desired_reward}"'
 
+            self.dbmgr.write("UPDATE chatters SET points=? WHERE user_lower=?", (new_points, self.user))
+            self.whisper(config.bot_channel, purchase_whisper)
+
+        return
+        
     #further parsing and message handling
 
     def handle_message(self):
+
+        if self.user == 'twitch server':
+            return
 
         separate = re.split('[ !]', self.message, 3)
 
@@ -407,16 +460,16 @@ class MessageHandler:
         if self.points_toggle == True:
             self.add_points()
 
-        if self.active_game == True:
-            pass
-
         if self.message[0] == "!":
-            command = self.message[1:].lower()
+
+            command_list = [command[0] for command in self.dbmgr.query("SELECT * FROM commands").fetchall()]
+
             if separate[1] in self.dynamic_commands:
                 self.dynamic_command(separate)
-            elif separate[1] in self.commands_dict:
-                self.send_message(self.commands_dict[command])
-            elif separate[1] not in self.commands_dict:
+            elif separate[1] in command_list:
+                command_text = self.dbmgr.query("SELECT command_text FROM commands WHERE command=?", (separate[1],)).fetchone()[0]
+                self.send_message(command_text)
+            elif separate[1] not in command_list:
                 pass
         
 #        elif self.message[0] == "?":
@@ -430,13 +483,9 @@ class MessageHandler:
 #            elif separate[1] in self.games_list:
 #                games.decide_winner(separate[2])
         
+        print(f'{self.user} wrote: {self.message} at {self.message_time}') #debug, remove later
+        self.bot_instructions[0].append("increment")
   
-
-        print(f'{self.user} wrote: {self.message} at {self.comment_time}')
-        #print(active_game)
-        self.write_chatters()
-
-        self.bot_instructions.append("increment") #this will be structured differently later
         return self.bot_instructions
 
 

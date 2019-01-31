@@ -48,6 +48,10 @@ There are four levels of permissions: admin, mod, games, and none. When you firs
 
 <b>!take</b> *(user)* *(points)* - Subtracts points from a user's current total.
 
+<b>!pointson</b> and <b>!pointsoff</b> - These commands will toggle points-earning on and off. Useful if you want to run the bot while you're not streaming.
+
+<b>!shutdown</b> - Shuts the bot down. It will need to be manually restarted after using this command.
+
 <h2>Moderator Commands</h2>
 
 <b>!setreminder</b> *(reminder message)* - Sets the regular reminder message. Changing this to "none" will disable the reminder until it is changed to something else. *ex: !setreminder Feel free to join out discord server*
