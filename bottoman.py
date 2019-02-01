@@ -11,11 +11,13 @@ class TwitchBot:
 
     def __init__(self):
 
+        init_time = time.time()
         self.s = self.open_socket()
-        self.reminder_counter = [0, time.time()]
+        self.reminder_counter = [0, init_time]
         self.active_game = False
         self.points_toggle = True
         self.dbmgr = DatabaseManager('db/bottoman.db')
+        self.append_data = (config.append_string, init_time, config.append_timer)
 
     #functions for initializing bot, joining room  
 
@@ -116,6 +118,40 @@ class TwitchBot:
 
         return
 
+    #message appender
+
+    def append_to_message(self, message, a_string):
+        """
+        appends message with string set in config.py. 
+        checks whether user wants a new sentence or not and formats appropriately
+        """
+
+        if a_string == '':
+            return
+
+        is_sentence = a_string[0].isupper()
+        is_terminated = (message[-1] in ['.', '!', '?'])
+
+        if is_sentence == True:
+            if is_terminated == True:
+                new_message = ' '.join([message, a_string])
+                self.send_message(new_message)
+            elif is_terminated == False:
+                new_message = '. '.join([message, a_string])
+                self.send_message(new_message)
+
+        if is_sentence ==False:
+            if is_terminated == True:
+                new_message = ' '.join([message[:-1], a_string])
+                self.send_message(new_message)
+            elif is_terminated == False:
+                new_message = ' '.join([message, a_string])
+                self.send_message(new_message)
+
+        self.append_data = (config.append_string, time.time(), config.append_timer)
+        
+        return
+
     #main infinite loop
 
     def run_time(self):
@@ -135,6 +171,9 @@ class TwitchBot:
             
             elif self.active_game == True:
                 pass
+
+            if msg_info[2] - self.append_data[1] >= self.append_data[2] and self.append_data[2] != 0:
+                self.append_to_message(msg_info[1], self.append_data[0])
 
             self.instruction_handler(instruction)
             self.reminder_message()

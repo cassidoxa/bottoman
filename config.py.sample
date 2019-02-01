@@ -17,3 +17,12 @@ points_cooldown = 80 #cooldown for earning points by chatting in seconds
 
 reminder_posts = 100 #number of messages before reminder msg sends and counter resets. set to zero to disable
 reminder_seconds = 1200 #number of seconds. default is 1200 seconds or 20 minutes  set to zero to disable
+
+#append options
+
+#appends a string to a message then sends the new message to chat based on a timer.
+#if the first character of this string is upper case, will treat it as a new sentence, otherwise will
+#treat it as an addition to the last sentence of the message
+
+append_timer = 1200 #time in seconds. default is 1200 or 20 minutes. Set 0 to disable
+append_string = ""
