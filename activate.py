@@ -18,7 +18,7 @@ def get_user_id_display(user):
 def check_admin():
     """check for an admin. If no admin user, ask for one and add to chatters db."""
     
-    conn = sqlite3.connect('db/test.db')
+    conn = sqlite3.connect('db/bottoman.db')
     c = conn.cursor()
 
     permissions_list = [i[0] for i in c.execute("SELECT permissions FROM chatters").fetchall()]

@@ -1,7 +1,4 @@
-HOST = "irc.twitch.tv"
-PORT = 6667
-
-#channel and authentication info
+#channel and authentication info. must be changed during setup.
 
 token = "oauth:"
 bot_name = "bottoman"

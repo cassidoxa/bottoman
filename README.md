@@ -10,11 +10,9 @@ Running bottoman requires python 3.6 or above, its own twitch account, and an oa
 
 The first step is to download bottoman. You can use `git clone` or use the "clone or download button" on github to download a zip file. Extract the zip file into whatever directory you'd like (example for windows users: `C:\Users\Me\bottoman`).
 
-<b>Step 2: Copy or rename chatters.json.sample, commands.json.sample, and config.py.sample</b>
+<b>Step 2: Copy or rename config.py.sample</b>
 
-Bottoman stores and retrieves the commands you set and information about people who talk in your chat in two files, chatters.json and commands.json. There are two sample files where you can see the format that it stores this information with some sample data. Before you start using bottoman, you must either copy these files and rename the copies without the .sample at the end (chatters.json, commands.json, and config.py respectively) or simply rename them and remove ".sample". I recommend keeping the sample files on hand. You can edit the json files manually with whatever values you wish, but you must take care to enter data in the correct format. All values can be safely edited in twitch chat with the appropriate commands so manually editing the json files is never necessary.
-
-Config.py does require manual editing, covered in the next section. 
+Bottoman stores some configuration information in a file called `config.py`. Included in this repository is a file called `config.py.sample` with a sample configuration. First, make a copy of the sample and name it `config.py` or simply rename the sample. This file will require some manual editing on your part as you continue this setup:
 
 <b>Step 3: Register your bot's twitch account, get an oauth token, and edit config.py</b>
 

@@ -14,7 +14,7 @@ class TwitchBot:
         self.reminder_counter = [0, time.time()]
         self.active_game = False
         self.points_toggle = True
-        self.dbmgr = DatabaseManager('db/test.db')
+        self.dbmgr = DatabaseManager('db/bottoman.db')
 
     #functions for initializing bot, joining room  
 
