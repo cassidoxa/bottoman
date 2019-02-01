@@ -179,6 +179,9 @@ class MessageHandler:
             self.send_message(f'Error: Must use an integer number with the !give command')
             return
 
+        if removed_points <= 0:
+            return
+
         try:
             user_id, user_display = self.get_user_id_display(user)
         except IndexError:
@@ -203,6 +206,9 @@ class MessageHandler:
             removed_points = int(removed_points)
         except ValueError:
             self.send_message(f'Error: Must use an integer with the !take command')
+            return
+
+        if removed_points <= 0:
             return
 
         try:
