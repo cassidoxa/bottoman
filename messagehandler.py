@@ -462,7 +462,7 @@ class MessageHandler:
         separate = re.split('[ !]', self.message, 3)
 
         self.check_user()
-        if self.points_toggle == True:
+        if self.points_toggle == True and config.message_points != 0:
             self.add_points()
 
         if self.message[0] == "!":
