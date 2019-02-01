@@ -2,6 +2,7 @@ import socket
 import re
 import time
 import sqlite3
+import sys
 
 import config
 import messagehandler as mh
@@ -106,7 +107,11 @@ class TwitchBot:
             if instructions[1]['sendwhisper'] != None:
                 self.whisper(instructions[1]['sendwhisper'][0], instructions[1]['sendwhisper'][1])
 
-        except TypeError:
+            if 'shutdown' in instructions[0]:
+                self.send_message(f'{config.exit_msg}')
+                sys.exit()
+
+        except TypeError: #prevents error when twitch server sends ping
             pass
 
         return

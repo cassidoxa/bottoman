@@ -84,7 +84,7 @@ class MessageHandler:
         header = {"Authorization": f'Bearer {token}'}
         response = requests.get(f'https://api.twitch.tv/helix/users?login={user}', headers=header).json()
         
-        return (response['data'][0]['id'], response['data'][0]['display_name'])
+        return (int(response['data'][0]['id']), response['data'][0]['display_name'])
 
     def check_user(self):
         """
@@ -149,20 +149,20 @@ class MessageHandler:
             pass
 
         try:
-            user_id_display = self.get_user_id_display(changed_user)
+            user_id, user_display = self.get_user_id_display(changed_user)
         except IndexError:
             self.send_message(f'Error adding new permissions for user "{changed_user}". Check spelling.')
             return
 
         user_id_list = [id[0] for id in self.dbmgr.query("SELECT user_id FROM chatters")]
 
-        if user_id_display[0] in user_id_list:
-            self.dbmgr.write("UPDATE chatters SET permissions=? WHERE user_id=?", (new_permissions, user_id_display[0]))
-            self.send_message(f'{user_id_display[1]} given "{new_permissions}" permissions')
-        elif user_id_display[0] not in user_id_list:
-            self.add_user(user_id_display[0], user_id_display[1].lower(), user_id_display[1])
-            self.dbmgr.write("UPDATE chatters SET permissions=? WHERE user_id=?", (new_permissions, user_id_display[0]))
-            self.send_message(f'{user_id_display[1]} given "{new_permissions}" permissions')
+        if user_id in user_id_list:
+            self.dbmgr.write("UPDATE chatters SET permissions=? WHERE user_id=?", (new_permissions, user_id))
+            self.send_message(f'{user_display} given "{new_permissions}" permissions')
+        elif user_id not in user_id_list:
+            self.add_user(user_id, user_display.lower(), user_display)
+            self.dbmgr.write("UPDATE chatters SET permissions=? WHERE user_id=?", (new_permissions, user_id))
+            self.send_message(f'{user_display} given "{new_permissions}" permissions')
 
         return
 
@@ -180,19 +180,19 @@ class MessageHandler:
             return
 
         try:
-            user_id_display = self.get_user_id_display(user)
+            user_id, user_display = self.get_user_id_display(user)
         except IndexError:
             self.send_message(f'Error giving points: Check spelling. This command is not case-sensitive')
             return
 
-        database_check = self.dbmgr.query("SELECT * FROM chatters WHERE user_id=?", (user_id_display[0],)).fetchone()
+        database_check = self.dbmgr.query("SELECT * FROM chatters WHERE user_id=?", (user_id,)).fetchone()
         if database_check == None:
-            self.add_user(user_id_display[0], user_id_display[1].lower(), user_id_display[1], added_points)
-            self.send_message(f'Gave {user_id_display[1]} {added_points} points')
+            self.add_user(user_id, user_display.lower(), user_display, added_points)
+            self.send_message(f'Gave {user_display} {added_points} points')
             return
         else: 
-            self.dbmgr.write("UPDATE chatters SET points= points + ? WHERE user_id=?", (added_points, user_id_display[0],))
-            self.send_message(f'Gave {user_id_display[1]} {added_points} points')
+            self.dbmgr.write("UPDATE chatters SET points= points + ? WHERE user_id=?", (added_points, user_id,))
+            self.send_message(f'Gave {user_display} {added_points} points')
 
         return
 
@@ -206,24 +206,24 @@ class MessageHandler:
             return
 
         try:
-            user_id_display = self.get_user_id_display(user)
+            user_id, user_display = self.get_user_id_display(user)
         except IndexError:
             self.send_message(f'Error removing points: Check spelling. This command is not case-sensitive')
             return
 
-        current_points = self.dbmgr.query("SELECT points FROM chatters WHERE user_id=?", (user_id_display[0],)).fetchone()[0]
+        current_points = self.dbmgr.query("SELECT points FROM chatters WHERE user_id=?", (user_id,)).fetchone()[0]
 
         if current_points == None:
-            self.send_message(f'{user_id_display[1]} hasn\'t chatted in here yet')
+            self.send_message(f'{user_display} hasn\'t chatted in here yet')
             return
 
         else:
             
-            user = user_id_display[1]
+            user = user_display
             new_points = current_points - removed_points
 
             if new_points >= 0:
-                self.dbmgr.write("UPDATE chatters SET points=? WHERE user_id=?", (new_points, user_id_display[0],))
+                self.dbmgr.write("UPDATE chatters SET points=? WHERE user_id=?", (new_points, user_id,))
                 self.send_message(f'{self.user_display} took {removed_points} from {user}. {user} now has {new_points}')
             elif new_points < 0:
                 self.dbmgr.write("UPDATE chatters SET points=0 WHERE user_id=?", (user_id_display[0],))
@@ -285,8 +285,7 @@ class MessageHandler:
             elif command[1] == "pointsoff" and self.permission_hierarchy[permissions] >= 3:
                 self.ptoggle_off()
             elif command[1] == "shutdown" and self.permission_hierarchy[permissions] >= 3:
-                self.send_message(f'{config.exit_msg}')
-                sys.exit()
+                self.bot_instructions[0].append(f'shutdown')
         except IndexError:
             self.send_message(f'Malformed command. Please try again')
 
