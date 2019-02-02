@@ -179,7 +179,7 @@ class MessageHandler:
             self.send_message(f'Error: Must use an integer number with the !give command')
             return
 
-        if removed_points <= 0:
+        if added_points <= 0:
             return
 
         try:
@@ -448,6 +448,7 @@ class MessageHandler:
             purchase_whisper = f'{self.user_display} purchased "{desired_reward}"'
 
             self.dbmgr.write("UPDATE chatters SET points=? WHERE user_lower=?", (new_points, self.user))
+            self.send_message(purchase_whisper)
             self.whisper(config.bot_channel, purchase_whisper)
 
         return
