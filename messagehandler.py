@@ -135,8 +135,8 @@ class MessageHandler:
         makes the bot send a message telling user how many points they have
         """
         
-        points = self.dbmgr.query("SELECT points FROM chatters WHERE user_lower=?", (self.user,)).fetchone()[0]
-        self.send_message(f'{self.user}, you have {points} points')
+        points, user_display  = self.dbmgr.query("SELECT points, user_display FROM chatters WHERE user_lower=?", (self.user,)).fetchone()
+        self.send_message(f'{user_display}, you have {points} points')
         return
 
     def change_permissions(self, changed_user, new_permissions):
