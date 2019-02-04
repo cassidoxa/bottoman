@@ -179,7 +179,7 @@ class MessageHandler:
             self.send_message(f'Error: Must use an integer number with the !give command')
             return
 
-        if removed_points <= 0:
+        if added_points <= 0:
             return
 
         try:
