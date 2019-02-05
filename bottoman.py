@@ -58,10 +58,10 @@ class TwitchBot:
     def parse_message(self, line):
         """
         takes chat data from twitch and returns a user, message, and unix time to give to message handler
-        """
-        
+        this fuction also handles the PING-PONG call and response from Twitch server for convenience"""
+
         separate = re.split('[:!]', line, 3)
-        if separate[0].rstrip() == 'PING':  
+        if separate[0].rstrip() == 'PING':
             self.s.send(b"PONG http://localhost\r\n")
             return ("twitch server", "ping", 0)
         else:
@@ -75,7 +75,7 @@ class TwitchBot:
         send a message to chat at a regular interval based on time or number of messages
         also checks to see if these values are set to 0 in config.py and dis
         """
-        
+
         post_number = self.reminder_counter[0]
         reminder_timer = self.reminder_counter[1]
 
@@ -94,7 +94,7 @@ class TwitchBot:
         try:
             if 'increment' in instructions[0]:
                 self.reminder_counter[0] += 1
-    
+
             if 'ptoggle on' in instructions[0]:
                 self.points_toggle = True
 
@@ -103,7 +103,7 @@ class TwitchBot:
 
             if instructions[1]['sendmsg'] != None:
                 self.send_message(instructions[1]['sendmsg']) 
-        
+
             if instructions[1]['sendwhisper'] != None:
                 self.whisper(instructions[1]['sendwhisper'][0], instructions[1]['sendwhisper'][1])
 
@@ -129,10 +129,13 @@ class TwitchBot:
             read_buffer = self.s.recv(2048).decode()
             msg_info = self.parse_message(read_buffer)
 
+            if msg_info[0] == 'twitch server':
+                continue
+
             if self.active_game == False:
                 message_handler = mh.MessageHandler(msg_info, self.active_game, self.points_toggle, self.dbmgr)
                 instruction = message_handler.handle_message()
-            
+
             elif self.active_game == True:
                 pass
 

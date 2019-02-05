@@ -17,16 +17,16 @@ def get_user_id_display(user):
 
 def check_admin():
     """check for an admin. If no admin user, ask for one and add to chatters db."""
-    
+
     conn = sqlite3.connect('db/bottoman.db')
     c = conn.cursor()
 
     permissions_list = [i[0] for i in c.execute("SELECT permissions FROM chatters").fetchall()]
-    
+
     if 'admin' in permissions_list:
         return
-    
-    else: 
+
+    else:
         admin_flag = False
         while admin_flag == False:
             admin = input(f"This bot has no admin. Please enter the name of your twitch channel you'll use it on: ") 
@@ -44,11 +44,11 @@ def check_admin():
                 continue
 
     return
-                    
+
 #check for admin, initialize bot, join room, send hello message
 check_admin()
 bottoman = TwitchBot()
 bottoman.join_room(bottoman.s)
-#bottoman.send_message(config.join_msg)
+bottoman.send_message(config.join_msg)
 
 bottoman.run_time()
