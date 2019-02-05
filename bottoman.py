@@ -58,7 +58,8 @@ class TwitchBot:
     def parse_message(self, line):
         """
         takes chat data from twitch and returns a user, message, and unix time to give to message handler
-        this fuction also handles the PING-PONG call and response from Twitch server for convenience"""
+        this function also handles the PING-PONG call and response from Twitch server for convenience
+        """
 
         separate = re.split('[:!]', line, 3)
         if separate[0].rstrip() == 'PING':
