@@ -1,23 +1,28 @@
 import socket
 import re
+import random
 import time
 import sqlite3
 import sys
 
 import config
+from db.db import DatabaseManager
 import messagehandler as mh
 
 class TwitchBot:
 
     def __init__(self):
 
+        init_time = time.time()
         self.s = self.open_socket()
-        self.reminder_counter = [0, time.time()]
+        self.reminder_counter = [0, init_time]
         self.active_game = False
         self.points_toggle = True
         self.dbmgr = DatabaseManager('db/bottoman.db')
+        self.append_timer = init_time
+        self.append_cooldown = self.dbmgr.query("SELECT config_number FROM config WHERE config_option=?", ('append_cooldown',)).fetchone()[0]
 
-    #functions for initializing bot, joining room  
+    #functions for initializing bot, joining room
 
     def open_socket(self):
 
@@ -58,7 +63,7 @@ class TwitchBot:
     def parse_message(self, line):
         """
         takes chat data from twitch and returns a user, message, and unix time to give to message handler
-        this function also handles the PING-PONG call and response from Twitch server for convenience
+        the PING-PONG call and response is also handled in this function for convenience
         """
 
         separate = re.split('[:!]', line, 3)
@@ -108,6 +113,9 @@ class TwitchBot:
             if instructions[1]['sendwhisper'] != None:
                 self.whisper(instructions[1]['sendwhisper'][0], instructions[1]['sendwhisper'][1])
 
+            if instructions[1]['appendcooldown'] != None:
+                self.append_cooldown = instructions[1]['appendcooldown']
+
             if 'shutdown' in instructions[0]:
                 self.send_message(f'{config.exit_msg}')
                 sys.exit()
@@ -130,6 +138,8 @@ class TwitchBot:
             read_buffer = self.s.recv(2048).decode()
             msg_info = self.parse_message(read_buffer)
 
+            self.reminder_message()
+
             if msg_info[0] == 'twitch server':
                 continue
 
@@ -137,25 +147,51 @@ class TwitchBot:
                 message_handler = mh.MessageHandler(msg_info, self.active_game, self.points_toggle, self.dbmgr)
                 instruction = message_handler.handle_message()
 
+                if msg_info[2] - self.append_timer >= self.append_cooldown and self.append_cooldown != 0 and msg_info[1][0] != '!':
+                   self.append_to(msg_info[1])
+
             elif self.active_game == True:
                 pass
 
             self.instruction_handler(instruction)
-            self.reminder_message()
 
-class DatabaseManager:
-    def __init__(self, db):
-        self.conn = sqlite3.connect(db)
-        self.c = self.conn.cursor()
+#additional functions
 
-    def query(self, arg, tup=()):
-        self.c.execute(arg, tup)
-        return self.c
+#message appending
 
-    def write(self, arg, tup=()):
-        self.c.execute(arg, tup)
-        self.conn.commit()
-        return self.c
+    def append_to(self, message):
+        """
+        appends message with strings added via user commands
+        checks whether user wants a new sentence or not and formats appropriately
+        returns message for bot to send to chat
+        """
 
-    def __del__(self):
-        self.conn.close()
+        append_strings = [a_str[0] for a_str in self.dbmgr.query("SELECT append_string FROM append_strings")]
+
+        if not append_strings:
+            return
+
+        a_string = random.choice(append_strings)
+
+        is_sentence = a_string[0].isupper()
+        is_terminated = (message[-1] in ['.', '!', '?'])
+
+        if is_sentence == True:
+            if is_terminated == True:
+                new_message = ' '.join([message, a_string])
+                self.send_message(new_message)
+            elif is_terminated == False:
+                new_message = '. '.join([message, a_string])
+                self.send_message(new_message)
+
+        if is_sentence ==False:
+            if is_terminated == True:
+                new_message = ' '.join([message[:-1], a_string])
+                self.send_message(new_message)
+            elif is_terminated == False:
+                new_message = ' '.join([message, a_string])
+                self.send_message(new_message)
+
+        self.append_timer = time.time()
+
+        return
