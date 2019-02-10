@@ -3,6 +3,7 @@ import requests
 
 from bottoman import TwitchBot
 import config
+from db.db import DatabaseManager
 
 def get_user_id_display(user):
     """
@@ -18,10 +19,9 @@ def get_user_id_display(user):
 def check_admin():
     """check for an admin. If no admin user, ask for one and add to chatters db."""
 
-    conn = sqlite3.connect('db/bottoman.db')
-    c = conn.cursor()
+    dbmgr = DatabaseManager('db/bottoman.db')
 
-    permissions_list = [i[0] for i in c.execute("SELECT permissions FROM chatters").fetchall()]
+    permissions_list = [i[0] for i in dbmgr.query("SELECT permissions FROM chatters").fetchall()]
 
     if 'admin' in permissions_list:
         return
@@ -33,9 +33,8 @@ def check_admin():
             double_check = input(f'The admin account will be {admin}. Is this correct? (y/n): ')
             if double_check.lower() == "y":
                 user_id, name = get_user_id_display(admin)
-                c.execute("INSERT INTO chatters VALUES (?,?,?,?,?,?)", (user_id, name.lower(), name, 'admin', 1, 0,))
-                conn.commit()
-                conn.close()
+                dbmgr.write("INSERT INTO chatters VALUES (?,?,?,?,?,?)", (user_id, name.lower(), name, 'admin', 1, 0,))
+                dbmgr.close()
                 admin_flag = True
             elif double_check.lower() == "n":
                 continue
@@ -47,6 +46,7 @@ def check_admin():
 
 #check for admin, initialize bot, join room, send hello message
 check_admin()
+
 bottoman = TwitchBot()
 bottoman.join_room(bottoman.s)
 bottoman.send_message(config.join_msg)

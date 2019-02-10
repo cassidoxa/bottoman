@@ -1,10 +1,12 @@
 import socket
 import re
+import random
 import time
 import sqlite3
 import sys
 
 import config
+from db.db import DatabaseManager
 import messagehandler as mh
 
 class TwitchBot:
@@ -17,7 +19,8 @@ class TwitchBot:
         self.active_game = False
         self.points_toggle = True
         self.dbmgr = DatabaseManager('db/bottoman.db')
-        self.append_data = (config.append_string, init_time, config.append_timer)
+        self.append_timer = init_time
+        self.append_cooldown = self.dbmgr.query("SELECT config_number FROM config WHERE config_option=?", ('append_cooldown',)).fetchone()[0]
 
     #functions for initializing bot, joining room
 
@@ -110,6 +113,9 @@ class TwitchBot:
             if instructions[1]['sendwhisper'] != None:
                 self.whisper(instructions[1]['sendwhisper'][0], instructions[1]['sendwhisper'][1])
 
+            if instructions[1]['appendcooldown'] != None:
+                self.append_cooldown = instructions[1]['appendcooldown']
+
             if 'shutdown' in instructions[0]:
                 self.send_message(f'{config.exit_msg}')
                 sys.exit()
@@ -119,16 +125,53 @@ class TwitchBot:
 
         return
 
-    #message appender
+    #main infinite loop
 
-    def append_to_message(self, message, a_string):
+    def run_time(self):
         """
-        appends message with string set in config.py.
+        recieves data from twitch, parses it, gives individual messages to message handler for further processing
+        the message handler can return an instruction to the bot in the "instruction" variable.
+        checks if there is an active game and handles messages differently while game is running until game stops
+        """
+
+        while True:
+            read_buffer = self.s.recv(2048).decode()
+            msg_info = self.parse_message(read_buffer)
+
+            self.reminder_message()
+
+            if msg_info[0] == 'twitch server':
+                continue
+
+            if self.active_game == False:
+                message_handler = mh.MessageHandler(msg_info, self.active_game, self.points_toggle, self.dbmgr)
+                instruction = message_handler.handle_message()
+
+                if msg_info[2] - self.append_timer >= self.append_cooldown and self.append_cooldown != 0 and msg_info[1][0] != '!':
+                   self.append_to(msg_info[1])
+
+            elif self.active_game == True:
+                pass
+
+            self.instruction_handler(instruction)
+
+#additional functions
+
+#message appending
+
+    def append_to(self, message):
+        """
+        appends message with strings added via user commands
         checks whether user wants a new sentence or not and formats appropriately
+        returns message for bot to send to chat
         """
 
-        if a_string == '':
+        append_strings = [a_str[0] for a_str in self.dbmgr.query("SELECT append_string FROM append_strings")]
+
+        if not append_strings:
             return
+
+        a_string = random.choice(append_strings)
 
         is_sentence = a_string[0].isupper()
         is_terminated = (message[-1] in ['.', '!', '?'])
@@ -149,52 +192,6 @@ class TwitchBot:
                 new_message = ' '.join([message, a_string])
                 self.send_message(new_message)
 
-        self.append_data = (config.append_string, time.time(), config.append_timer)
+        self.append_timer = time.time()
 
         return
-
-    #main infinite loop
-
-    def run_time(self):
-        """
-        recieves data from twitch, parses it, gives individual messages to message handler for further processing
-        the message handler can return an instruction to the bot in the "instruction" variable.
-        checks if there is an active game and handles messages differently while game is running until game stops
-        """
-
-        while True:
-            read_buffer = self.s.recv(2048).decode()
-            msg_info = self.parse_message(read_buffer)
-
-            if msg_info[0] == 'twitch server':
-                continue
-
-            if self.active_game == False:
-                message_handler = mh.MessageHandler(msg_info, self.active_game, self.points_toggle, self.dbmgr)
-                instruction = message_handler.handle_message()
-
-            elif self.active_game == True:
-                pass
-
-            if msg_info[2] - self.append_data[1] >= self.append_data[2] and self.append_data[2] != 0:
-                self.append_to_message(msg_info[1], self.append_data[0])
-
-            self.instruction_handler(instruction)
-            self.reminder_message()
-
-class DatabaseManager:
-    def __init__(self, db):
-        self.conn = sqlite3.connect(db)
-        self.c = self.conn.cursor()
-
-    def query(self, arg, tup=()):
-        self.c.execute(arg, tup)
-        return self.c
-
-    def write(self, arg, tup=()):
-        self.c.execute(arg, tup)
-        self.conn.commit()
-        return self.c
-
-    def __del__(self):
-        self.conn.close()
