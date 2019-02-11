@@ -1,6 +1,7 @@
-import requests
+import json
 import re
 import sys
+import urllib
 
 import config
 
@@ -184,10 +185,13 @@ class MessageHandler:
         user name
         """
 
-        print(f'Ran get_user_id_display() - debug')
         token = config.token[6:]
         header = {"Authorization": f'Bearer {token}'}
-        response = requests.get(f'https://api.twitch.tv/helix/users?login={user}', headers=header).json()
+        url = f'https://api.twitch.tv/helix/users?login={user}'
+        
+        req = urllib.request.Request(url, headers=header)
+        response = urllib.request.urlopen(req).read().decode('utf-8')
+        response = json.loads(response)
 
         return (int(response['data'][0]['id']), response['data'][0]['display_name'])
 

@@ -1,5 +1,6 @@
+import json
 import sqlite3
-import requests
+import urllib
 
 from bottoman import TwitchBot
 import config
@@ -13,8 +14,12 @@ def get_user_id_display(user):
 
     token = config.token[6:]
     header = {"Authorization": f'Bearer {token}'}
-    response = requests.get(f'https://api.twitch.tv/helix/users?login={user}', headers=header).json()
-    return (response['data'][0]['id'], response['data'][0]['display_name'])
+    url = f'https://api.twitch.tv/helix/users?login={user}'
+    req = urllib.request.Request(url, headers=header)
+    response = urllib.request.urlopen(req).read().decode('utf-8')
+    response = json.loads(response)
+
+    return (int(response['data'][0]['id']), response['data'][0]['display_name'])
 
 def check_admin():
     """check for an admin. If no admin user, ask for one and add to chatters db."""
