@@ -72,9 +72,11 @@ class MessageHandler:
 
         if not ids:
             self.dbmgr.write("INSERT INTO append_strings VALUES (?,?)", (1, append_str.rstrip(),))
+            self.send_message(f'String added')
         elif ids:
             new_id = max(ids) + 1
             self.dbmgr.write("INSERT INTO append_strings VALUES (?,?)", (new_id, append_str.rstrip(),))
+            self.send_message(f'String added')
 
         return
 
@@ -145,14 +147,17 @@ class MessageHandler:
         if time[0][-1].isdigit():
             self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (time_number, 'append_cooldown'))
             self.bot_instructions[1]['appendcooldown'] = time_number
+            self.send_message(f'Append cooldown set')
         elif time[0][-1] == 'h':
             time_number = int(time_number * 3600)
             self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (time_number, 'append_cooldown'))
             self.bot_instructions[1]['appendcooldown'] = time_number
+            self.send_message(f'Append cooldown set')
         elif time[0][-1] == 'm':
             time_number = int(time_number * 60)
             self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (time_number, 'append_cooldown'))
             self.bot_instructions[1]['appendcooldown'] = time_number
+            self.send_message(f'Append cooldown set')
         elif time[0][-1] not in ['m', 'h']:
             self.send_message(f'Error: Malformed command. argument must be in seconds or minutes/hours with "h" or "m" after number')
 
@@ -564,8 +569,6 @@ class MessageHandler:
             self.send_message(f'{purchase_whisper}')
 
         return
-
-    #appending functions
 
     #further parsing and message handling
 
