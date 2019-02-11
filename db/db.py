@@ -16,6 +16,8 @@ class DatabaseManager:
 
     def close(self):
         self.conn.close()
+        return
 
     def __del__(self):
         self.conn.close()
+        return
