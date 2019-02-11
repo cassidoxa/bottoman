@@ -36,15 +36,15 @@ There are four levels of permissions: admin, mod, games, and none. When you firs
 
 <h2>Admin Commands</h2>
 
-<b>!changeuser</b> *(user)* *(permissions)* - Gives a user the desired permissions. *ex: !changuser cassidoxa mod*
+<b>!changeuser</b> *[user]* *[permissions]* - Gives a user the desired permissions. *ex: !changuser cassidoxa mod*
 
-<b>!addreward</b> *(cost)* *(reward)* - Adds a reward that will be displayed by the !rewards command. The first argument should be a number, the cost in points, and the second argument is a text description of the reward. *ex: !addreward 9999 One hour of play*
+<b>!addreward</b> *[cost]* *[reward]* - Adds a reward that will be displayed by the !rewards command. The first argument should be a number, the cost in points, and the second argument is a text description of the reward. *ex: !addreward 9999 One hour of play*
 
-<b>!delreward</b> *(reward)* - Deletes a reward, removing it from the rewards that will be displayed by the !rewards command.
+<b>!delreward</b> *[reward]* - Deletes a reward, removing it from the rewards that will be displayed by the !rewards command.
 
-<b>!give</b> *(user)* *(points)* - Gives a user desired number of points.
+<b>!give</b> *[user]* *[points]* - Gives a user desired number of points.
 
-<b>!take</b> *(user)* *(points)* - Subtracts points from a user's current total.
+<b>!take</b> *[user]* *[points]* - Subtracts points from a user's current total.
 
 <b>!pointson</b> and <b>!pointsoff</b> - These commands will toggle points-earning on and off. Useful if you want to run the bot while you're not streaming.
 
@@ -52,11 +52,11 @@ There are four levels of permissions: admin, mod, games, and none. When you firs
 
 <h2>Moderator Commands</h2>
 
-<b>!setreminder</b> *(reminder message)* - Sets the regular reminder message. Changing this to "none" will disable the reminder until it is changed to something else. *ex: !setreminder Feel free to join out discord server*
+<b>!setreminder</b> *[reminder message]* - Sets the regular reminder message. Changing this to "none" will disable the reminder until it is changed to something else. *ex: !setreminder Feel free to join out discord server*
 
-<b>!addcommand</b> *(command* *(command text)* - Adds a simple command that will return the command text when typed by anyone in chat.
+<b>!addcommand</b> *[command]* *[command text]* - Adds a simple command that will return the command text when typed by anyone in chat.
 
-<b>!delcommand</b> *(command)* - Removes an existing text command. Will not remove any commands listed here.
+<b>!delcommand</b> *[command]* - Removes an existing text command. Will not remove any commands listed here.
 
 <h2>Game Commands</h2>
 
@@ -64,12 +64,24 @@ Placeholder
 
 <h2>Commands Anyone Can Use</h2>
 
-<b>!commands</b> - Lists all available commands
+<b>!commands</b> - Lists all available commands.
 
-<b>!rewards</b> - Lists all available rewards and their cost in points
+<b>!rewards</b> - Lists all available rewards and their cost in points.
 
-<b>!points</b> - Tells a user their current point total
+<b>!points</b> - Tells a user their current point total.
 
-<b>!spend</b> *(reward)* - If a user has enough points for the desired reward, sends a whisper to your twitch account reminding you of their selection and subtracts the cost from their point total. If the user has too few points, the bot tells them this and shows their point total
+<b>!spend</b> *[reward]* - If a user has enough points for the desired reward, sends a whisper to your twitch account reminding you of their selection and subtracts the cost from their point total. If the user has too few points, the bot tells them this and shows their point total.
 
+<h2>Additional Commands</h2>
 
+<h3>String Appending</h3>
+
+Bottoman can optionally append strings to messages in chat based on a timer using the following commands as an admin. When the timer runs out, the bot will repeat the next message sent to chat with one of the strings you've set added to the end. If you add multiple strings, one will be chosen randomly. 
+
+<b>!appendcooldown</b> *[number]* - Sets the cooldown timer in seconds by default. You can also set the cooldown in minutes or hours by adding "m" or "h" after the number with no spaces. The default cooldown is 0 and this functionality can be disabled by setting this value to 0 again. *ex: !appendcooldown 1200, !appendcooldown 20m*
+
+<b>!listappend</b> - Lists the strings you've added along with an id number that can be used to delete them.
+
+<b>!addappend</b> *[string]* - Adds a string to the database. If the first character is upper-case, the string will be added as a new sentence when the bot repeats the message in chat. If not, the string will be added as an extention of the previous message without being formatted as a new sentence.
+
+<b>!delappend</b> *[id number]* - Deletes a string you've added using the id number provided by the `!listappend` command.
