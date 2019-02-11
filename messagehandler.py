@@ -1,7 +1,7 @@
 import json
 import re
 import sys
-import urllib
+import urllib.request
 
 import config
 

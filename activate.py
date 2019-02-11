@@ -1,6 +1,6 @@
 import json
 import sqlite3
-import urllib
+import urllib.request
 
 from bottoman import TwitchBot
 import config
