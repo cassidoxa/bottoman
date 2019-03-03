@@ -24,7 +24,7 @@ def get_user_id_display(user):
 def check_admin():
     """check for an admin. If no admin user, ask for one and add to chatters db."""
 
-    dbmgr = DatabaseManager('db/activate.db')
+    dbmgr = DatabaseManager('db/bottoman.db')
 
     permissions_list = [i[0] for i in dbmgr.query("SELECT permissions FROM chatters").fetchall()]
 
