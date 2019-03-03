@@ -1,12 +1,13 @@
-import socket
-import re
 import random
-import time
+import re
+import socket
 import sqlite3
 import sys
+import time
 
 import config
 from db.db import DatabaseManager
+#import games.game
 import messagehandler as mh
 
 class TwitchBot:
@@ -16,7 +17,7 @@ class TwitchBot:
         init_time = time.time()
         self.s = self.open_socket()
         self.reminder_counter = [0, init_time]
-        self.active_game = False
+        self.active_game = None
         self.points_toggle = True
         self.dbmgr = DatabaseManager('db/bottoman.db')
         self.append_timer = init_time
@@ -79,13 +80,16 @@ class TwitchBot:
     def reminder_message(self):
         """
         send a message to chat at a regular interval based on time or number of messages
-        also checks to see if these values are set to 0 in config.py and dis
+        also checks to see if these values are set to 0 in db, disables if 0
         """
 
         post_number = self.reminder_counter[0]
         reminder_timer = self.reminder_counter[1]
+	
+        reminder_messages = self.dbmgr.query("SELECT config_number FROM config WHERE config_option=?", ('reminder_interval_messages',)).fetchone()[0]
+        reminder_seconds = self.dbmgr.query("SELECT config_number FROM config WHERE config_option=?", ('reminder_interval_seconds',)).fetchone()[0]
 
-        if (post_number >= config.reminder_posts and config.reminder_posts != 0) or ((time.time() - reminder_timer > config.reminder_seconds) and config.reminder_seconds != 0):
+        if (post_number >= reminder_messages and reminder_messages != 0) or ((time.time() - reminder_timer > reminder_seconds) and reminder_seconds != 0):
             reminder_msg = self.dbmgr.query("SELECT config_text FROM config WHERE config_option=?", ('reminder_message',)).fetchone()[0]
             if reminder_msg == "none":
                 self.reminder_counter = [0, time.time()]
@@ -97,31 +101,30 @@ class TwitchBot:
 
     def instruction_handler(self, instructions):
 
-        try:
-            if 'increment' in instructions[0]:
-                self.reminder_counter[0] += 1
+        if 'increment' in instructions[0]:
+            self.reminder_counter[0] += 1
 
-            if 'ptoggle on' in instructions[0]:
-                self.points_toggle = True
+        if 'ptoggle on' in instructions[0]:
+            self.points_toggle = True
 
-            if 'ptoggle off' in instructions[0]:
-                self.points_toggle = False
+        if 'ptoggle off' in instructions[0]:
+            self.points_toggle = False
 
-            if instructions[1]['sendmsg'] != None:
-                self.send_message(instructions[1]['sendmsg']) 
+        if instructions[1]['sendmsg'] != None:
+            self.send_message(instructions[1]['sendmsg']) 
 
-            if instructions[1]['sendwhisper'] != None:
-                self.whisper(instructions[1]['sendwhisper'][0], instructions[1]['sendwhisper'][1])
+        if instructions[1]['sendwhisper'] != None:
+            self.whisper(instructions[1]['sendwhisper'][0], instructions[1]['sendwhisper'][1])
 
-            if instructions[1]['appendcooldown'] != None:
-                self.append_cooldown = instructions[1]['appendcooldown']
+        if instructions[1]['appendcooldown'] != None:
+            self.append_cooldown = instructions[1]['appendcooldown']
 
-            if 'shutdown' in instructions[0]:
-                self.send_message(f'{config.exit_msg}')
-                sys.exit()
+        #if instructions[1]['game_instruction'] == 'start':
+        #    game.Game(instructions[1]['game_name'])
 
-        except TypeError: #prevents error when twitch server sends ping
-            pass
+        if 'shutdown' in instructions[0]:
+            self.send_message(f'{config.exit_msg}')
+            sys.exit()
 
         return
 
@@ -143,17 +146,21 @@ class TwitchBot:
             if msg_info[0] == 'twitch server':
                 continue
 
-            if self.active_game == False:
-                message_handler = mh.MessageHandler(msg_info, self.active_game, self.points_toggle, self.dbmgr)
-                instruction = message_handler.handle_message()
+            message_handler = mh.MessageHandler(msg_info, self.active_game, self.points_toggle, self.dbmgr)
+            message_handler.handle_message()
+
+            if not self.active_game:
 
                 if msg_info[2] - self.append_timer >= self.append_cooldown and self.append_cooldown != 0 and msg_info[1][0] != '!':
                    self.append_to(msg_info[1])
 
-            elif self.active_game == True:
+            elif self.active_game:
+
+                active_game.take_chatter_input(msg_info)
+
                 pass
 
-            self.instruction_handler(instruction)
+            self.instruction_handler(message_handler.bot_instructions)
 
 #additional functions
 

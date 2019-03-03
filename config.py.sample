@@ -7,14 +7,3 @@ bot_channel = "cassidoxa"
 join_msg = "VoHiYo"
 exit_msg = "Goodbye"
 
-#points options
-
-message_points = 0 #points per message
-points_cooldown = 0 #cooldown for earning points by chatting in seconds
-
-#reminder options
-#set the number of messages or seconds for the bot to wait before sending reminder message
-
-reminder_posts = 0 #number of messages before reminder msg sends and counter resets. set to zero to disable
-reminder_seconds = 0 #number of seconds. default is 1200 seconds or 20 minutes  set to zero to disable
-

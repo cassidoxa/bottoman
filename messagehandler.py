@@ -19,7 +19,7 @@ class MessageHandler:
 
         self.permissions = ''
         self.permission_hierarchy = {"none" : 0, "games" : 1, "mod" : 2, "admin" : 3}
-        self.games_list = ["gtbk", "meateo"]
+        self.games_list = ['gtbk', 'meateo', 'fftrivia']
         self.dynamic_commands = {'changeuser': self.change_permissions,
                                  'addcommand': self.add_command,
                                  'delcommand': self.del_command,
@@ -38,9 +38,18 @@ class MessageHandler:
                                  'addappend': self.add_append,
                                  'delappend': self.del_append,
                                  'listappend': self.list_append,
-                                 'appendcooldown': self.set_append_cooldown}
+                                 'setappendcooldown': self.set_append_cooldown,
+                                 'setpoints': self.set_points,
+                                 'setpointscooldown': self.set_points_cooldown,
+                                 'setreminderinterval': self.set_reminder_interval}
 
-        self.bot_instructions = [[], {'sendmsg': None, 'sendwhisper': None, 'appendcooldown': None}]
+        self.bot_instructions = [[], {'sendmsg': None, 
+                                      'sendwhisper': None, 
+                                      'appendcooldown': None,
+                                      'game_name': None,
+                                      'game_instruction': [] }]
+
+    #reminder message related functions
 
     def set_reminder(self, reminder_msg):
         """
@@ -58,6 +67,46 @@ class MessageHandler:
 
         self.dbmgr.write("UPDATE config SET config_text=? WHERE config_option=?", (reminder_msg, 'reminder_message'))
         self.send_message("Reminder message set")
+        return
+
+    def set_reminder_interval(self, interval):
+        """sets reminder to send by time or number of messages to chat specified by second argument"""
+
+        if self.permission_hierarchy[self.permissions] < 3:
+            return
+
+        if not interval:
+            self.send_message(f'Must use a number with this command. Will set the interval in seconds by default. Can set an interval in messages using the format "!setreminderinterval [number] messages"')
+            return
+
+        try:
+            interval_int = int(interval[0])
+        except ValueError:
+            try:
+                interval_int = int(interval[0][:-1])
+            except ValueError:
+                self.send_message(f'Error: Malformed command. Reminder interval must be a positive number')
+                return
+
+        if len(interval) == 2 and interval[1] == 'messages':
+            self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (interval_int, 'reminder_interval_messages',))
+            self.send_message(f'Reminder message set to post once every {interval_int} messages')
+        elif interval[0][-1].isdigit() or interval[0][-1] == 's':
+            self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (interval_int, 'reminder_interval_seconds'))
+            self.send_message(f'Reminder interval set to {interval[0]}')
+        elif interval[0][-1] == 'h':
+            interval_int = int(interval_int * 3600)
+            self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (interval_int, 'reminder_interval_seconds'))
+            self.send_message(f'Reminder interval set to {interval[0]}')
+        elif interval[0][-1] == 'm':
+            interval_int = int(interval_int * 60)
+            self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (interval_int, 'reminder_interval_seconds'))
+            self.send_message(f'Reminder interval set to {interval[0]}')
+        elif interval[0][-1] not in ['m', 'h']:
+            self.send_message(f'Error: Malformed command. argument must be in seconds or minutes/hours with "h" or "m" after number')
+        else:
+            self.send_message(f'Error: Malformed command. Must in in format "!setreminderinterval [time]" or "!setreminderinterval [number] messages"')
+
         return
 
     #appending related functions
@@ -131,6 +180,9 @@ class MessageHandler:
         sets append cooldown in seconds. checks if argument is formatted correctly
         if "m" or "h" is last character, use multiplication to set correct amount of seconds in db
         """
+        
+        if self.permission_hierarchy[self.permissions] < 3:
+            return
 
         try:
             time_number = float(time[0])
@@ -145,7 +197,7 @@ class MessageHandler:
             self.send_message(f'Append cooldown cannot be negative')
             return
 
-        if time[0][-1].isdigit():
+        if time[0][-1].isdigit() or time[0][-1] == 's':
             self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (time_number, 'append_cooldown'))
             self.bot_instructions[1]['appendcooldown'] = time_number
             self.send_message(f'Append cooldown set')
@@ -225,14 +277,16 @@ class MessageHandler:
 
     def add_points(self):
         """
-        checks to see if points cooldown is active. if not, adds number of points set in config.py for one message
+        checks to see if points cooldown is active. if not, adds number of points set in db for one message
         the function for an admin to give a user a custom amount of points is give_points
         """
 
         old_time = self.dbmgr.query("SELECT message_time FROM chatters WHERE user_lower=?", (self.user,)).fetchone()[0]
+        points_cooldown = self.dbmgr.query("SELECT config_number FROM config WHERE config_option=?", ('points_cooldown',)).fetchone()[0]
+        points_message = self.dbmgr.query("SELECT config_number FROM config WHERE config_option=?", ('points_message',)).fetchone()[0]
 
-        if (self.message_time - old_time) >= config.points_cooldown:
-            self.dbmgr.write("UPDATE chatters SET points = points + ?, message_time=? WHERE user_lower=?", (config.message_points, self.message_time, self.user))
+        if (self.message_time - old_time) >= points_cooldown:
+            self.dbmgr.write("UPDATE chatters SET points = points + ?, message_time=? WHERE user_lower=?", (points_message, self.message_time, self.user))
 
         else:
             return
@@ -467,8 +521,6 @@ class MessageHandler:
         return
 
     #rewards functions
-    #reward information is stored in commands db with the two-word key "chat rewards" so it can't be
-    #overwritten by another command
 
     def list_rewards(self):
         """
@@ -574,19 +626,85 @@ class MessageHandler:
 
         return
 
+    #points per message config option functions
+
+    def set_points(self, points):
+        """sets points per message in db"""
+
+        if self.permission_hierarchy[self.permissions] < 3:
+            return
+
+        if not points:
+            self.send_message(f'Use this command to set how many points chatters will earn per message. You can also set a points-earning cooldown with !setpointscooldown')
+            return
+
+        try:
+            points_per = int(points[0])
+        except ValueError:
+            self.send_message(f'Malformed command. Points per message must be an integer')
+            return
+
+        if points_per < 0:
+            self.send_message(f'Points per message must be a positive number')
+            return
+
+        self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (points_per, 'points_message'))
+        self.send_message(f'Points per message set to {points_per}')
+
+    def set_points_cooldown(self, cooldown):
+
+        """
+        sets points cooldown in seconds. checks if argument is formatted correctly
+        if "m" or "h" is last character, use multiplication to set correct amount of seconds in db
+        """
+
+        if self.permission_hierarchy[self.permissions] < 3:
+            return
+
+        if not cooldown:
+            self.send_message(f'Error: Must use a number with this command. Will set the cooldown in seconds by default but you can set minutes or hours in the format "[number]m" or "[number]h"')
+            return
+
+        try:
+            cooldown_int = int(cooldown[0])
+        except ValueError:
+            try:
+                cooldown_int = int(cooldown[0][:-1])
+            except ValueError:
+                self.send_message(f'Error: Malformed command. argument must be in seconds or minutes/hours with "h" or "m" after number')
+                return
+
+        if cooldown_int < 0:
+            self.send_message(f'Points cooldown must be a positive number')
+            return
+
+        if cooldown[0][-1].isdigit() or cooldown[0][-1] == 's':
+            self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (cooldown_int, 'points_cooldown'))
+            self.send_message(f'Points cooldown set to {cooldown[0]}')
+        elif cooldown[0][-1] == 'h':
+            cooldown_int = int(cooldown_int * 3600)
+            self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (cooldown_int, 'points_cooldown'))
+            self.send_message(f'Points cooldown set to {cooldown[0]}')
+        elif cooldown[0][-1] == 'm':
+            cooldown_int = int(cooldown_int * 60)
+            self.dbmgr.write("UPDATE config SET config_number=? WHERE config_option=?", (cooldown_int, 'points_cooldown'))
+            self.send_message(f'Points cooldown set to {cooldown[0]}')
+        elif cooldown[0][-1] not in ['m', 'h']:
+            self.send_message(f'Error: Malformed command. argument must be in seconds or minutes/hours with "h" or "m" after number')
+
+        return
+        
     #further parsing and message handling
 
     def handle_message(self):
 
-        if self.user == 'twitch server':
-            return
-
+        print(f'{self.user} wrote: {self.message} at {self.message_time}') #debug, remove later
         self.check_user()
 
-        if self.points_toggle == True and config.message_points != 0:
+        if self.points_toggle == True:
             self.add_points()
 
-        separate = re.split('[ !]', self.message, 3)
+        separate = re.split('[ !?]', self.message, 3)
         if self.message[0] == "!":
 
             command_list = [command[0] for command in self.dbmgr.query("SELECT * FROM commands").fetchall()]
@@ -599,18 +717,12 @@ class MessageHandler:
             elif separate[1] not in command_list:
                 pass
 
-#        elif self.message[0] == "?":
-#            command = self.message[1:].lower()
-#            if separate[1] == "start":
-#                games.start_game(separate[2])
-#                bot_instruction = 'start game'
-#            elif separate[1] == "stop":
-#                games.end_game
-#                bot_instruction = "stop game"
-#            elif separate[1] in self.games_list:
-#                games.decide_winner(separate[2])
+        #elif self.message[0] == "?":
+        #    
+        #    if len(separate) == 3:
+        #
+        #    elif len(separate == 4:
 
-        print(f'{self.user} wrote: {self.message} at {self.message_time}') #debug, remove later
         self.bot_instructions[0].append("increment")
 
-        return self.bot_instructions
+        return
