@@ -3,4 +3,3 @@ config.py
 __pycache__/
 /db/test.db
 /db/__pycache__
-/games
