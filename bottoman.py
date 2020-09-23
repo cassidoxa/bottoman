@@ -6,7 +6,7 @@ import time
 
 import config
 from db.db import DatabaseManager
-from games.game import Game
+import games
 import messagehandler as mh
 
 
@@ -73,7 +73,7 @@ class TwitchBot:
         unix time to give to message handler the PING-PONG call and
         response is also handled in this function for convenience
         """
-
+        print(line)
         separate = re.split('[:!]', line, 3)
         if separate[0].rstrip() == 'PING':
             self.s.send(b"PONG http://localhost\r\n")
@@ -142,7 +142,7 @@ class TwitchBot:
             self.append_cooldown = instructions[1]['appendcooldown']
 
         if instructions[1]['game_instruction'] == 'start':
-            self.game = Game.Game(instructions[1]['game_name'])
+            self.game = games.Game(instructions[1]['game_name'])
             self.active_game = True
 
         if instructions[1]['game_instruction'] == 'stop':
@@ -188,11 +188,11 @@ class TwitchBot:
                         and msg_info[1][0] != '!'):
                     self.append_to(msg_info[1])
 
-            elif self.active_game:
-                self.game.take_chatter_input(msg_info[0], msg_info[1])
-                self.game.check_rounds()
-                self.instruction_handler(self.game.bot_instructions)
-                self.game.clear_instructions()
+            #elif self.active_game:
+            #    self.game.take_chatter_input(msg_info[0], msg_info[1])
+            #    self.game.check_rounds()
+            #    self.instruction_handler(self.game.bot_instructions)
+            #    self.game.clear_instructions()
 
             self.instruction_handler(message_handler.bot_instructions)
 

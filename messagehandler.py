@@ -331,15 +331,16 @@ class MessageHandler:
         uses twitch's API to get a user's token with their (case insensitive)
         user name
         """
-
+        
+        client_id = config.client_id
         token = config.token[6:]
-        header = {"Authorization": f'Bearer {token}'}
+
+        header = {"Client-Id": client_id, "Authorization": f'Bearer {token}'}
         url = f'https://api.twitch.tv/helix/users?login={user}'
 
         req = urllib.request.Request(url, headers=header)
         response = urllib.request.urlopen(req).read().decode('utf-8')
         response = json.loads(response)
-
         return (int(response['data'][0]['id']),
                 response['data'][0]['display_name'])
 
@@ -630,16 +631,7 @@ class MessageHandler:
         self.bot_instructions[0].append(f'ptoggle off')
         return
 
-    def shutdown(self):
-
-        if self.permission_hierarchy[self.permissions] < 3:
-            return
-
-        self.bot_instructions[0].append(f'shutdown')
-
     # command related functions
-    # the !bot command is a static text command in the db that can be
-    # overwritten but has an initial message about bottoman
 
     def dynamic_command(self, command):
         """
@@ -753,6 +745,13 @@ class MessageHandler:
                     !rewards, !buy{commands_string}')
 
         return
+
+    def shutdown(self):
+
+        if self.permission_hierarchy[self.permissions] < 3:
+            return
+
+        self.bot_instructions[0].append(f'shutdown')
 
     # rewards functions
 
@@ -1007,10 +1006,9 @@ class MessageHandler:
 
     def handle_message(self):
 
-        print(f'{self.user} wrote: {self.message} at {self.message_time}')
         self.check_user()
 
-        if self.points_toggle is True:
+        if self.points_toggle:
             self.add_points()
 
         separate = re.split('[ !?]', self.message, 3)

@@ -1,5 +1,4 @@
 import json
-import sqlite3
 import urllib.request
 
 from bottoman import TwitchBot
@@ -7,22 +6,24 @@ import config
 from db.db import DatabaseManager
 
 
+
 def get_user_id_display(user):
     """
     uses twitch's API to get a user's token with their (case insensitive)
     user name
     """
+    
+    client_id = config.client_id
+    token = "srtajsl3jjbhhtfrvk0dlsu33aytv2"
 
-    token = config.token[6:]
-    header = {"Authorization": f'Bearer {token}'}
+    header = {"Client-Id": client_id, "Authorization": f'Bearer {token}'}
     url = f'https://api.twitch.tv/helix/users?login={user}'
+
     req = urllib.request.Request(url, headers=header)
     response = urllib.request.urlopen(req).read().decode('utf-8')
     response = json.loads(response)
-
     return (int(response['data'][0]['id']),
             response['data'][0]['display_name'])
-
 
 def check_admin():
     """
